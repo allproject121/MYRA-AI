@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.database.Cursor
 import android.net.Uri
 import android.os.Build
@@ -13,6 +14,7 @@ import android.os.IBinder
 import android.provider.ContactsContract
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.myra.assistant.R
 import com.myra.assistant.ui.main.MainActivity
@@ -20,6 +22,7 @@ import com.myra.assistant.ui.main.MainActivity
 class CallMonitorService : Service() {
 
     companion object {
+        private const val TAG = "CallMonitorService"
         const val CHANNEL_ID = "myra_call_monitor_channel"
         const val NOTIFICATION_ID = 2002
         const val ACTION_CALL_ENDED = "com.myra.CALL_ENDED"
@@ -35,7 +38,26 @@ class CallMonitorService : Service() {
         super.onCreate()
         isRunning = true
         createNotificationChannel()
-        startForeground(NOTIFICATION_ID, buildNotification())
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    buildNotification(),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, buildNotification())
+            }
+        } catch (e: SecurityException) {
+            Log.w(TAG, "SecurityException starting foreground with phoneCall type, falling back", e)
+            try {
+                startForeground(NOTIFICATION_ID, buildNotification())
+            } catch (e2: Exception) {
+                Log.e(TAG, "Failed to start foreground service", e2)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception starting foreground service", e)
+        }
         registerPhoneStateListener()
     }
 

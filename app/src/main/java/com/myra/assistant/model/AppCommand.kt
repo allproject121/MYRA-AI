@@ -9,6 +9,7 @@ data class AppCommand(
         const val TYPE_OPEN_APP = "OPEN_APP"
         const val TYPE_CLOSE_APP = "CLOSE_APP"
         const val TYPE_CALL = "CALL"
+        const val TYPE_CALL_PHONE = "CALL_PHONE"
         const val TYPE_LOOKUP_CONTACT = "LOOKUP_CONTACT"
         const val TYPE_ANSWER_CALL = "ANSWER_CALL"
         const val TYPE_END_CALL = "END_CALL"
