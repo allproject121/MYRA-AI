@@ -1,3 +1,4 @@
 <resources>
-    <string name="app_name">MYRA AI Assistant</string>
+    <string name="app_name">MYRA</string>
+    <string name="accessibility_description">MYRA Assistant Accessibility Service to open/close apps and control screen navigation via voice commands.</string>
 </resources>

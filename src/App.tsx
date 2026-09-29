@@ -12,7 +12,7 @@ import { OrbAnimationView } from './components/OrbAnimationView';
 import { WaveformView } from './components/WaveformView';
 import { ChatRecycler } from './components/ChatRecycler';
 import { SettingsModal } from './components/SettingsModal';
-import { DeviceSimulatorModal } from './components/DeviceSimulatorModal';
+import { ToolsActionCenterModal } from './components/ToolsActionCenterModal';
 import { CallAssistantModal } from './components/CallAssistantModal';
 import { SecurityLockModal } from './components/SecurityLockModal';
 import { FloatingOrbOverlay } from './components/FloatingOrbOverlay';
@@ -22,19 +22,18 @@ import {
   Mic,
   MicOff,
   Send,
-  Smartphone,
+  Wrench,
   PhoneCall,
   Flame,
-  Volume2,
-  Sparkles,
-  Shield,
+  ShieldAlert,
   Layers,
+  Sparkles,
 } from 'lucide-react';
 
 export default function App() {
   // State
   const [personality, setPersonality] = useState<Personality>('gf');
-  const [userName, setUserName] = useState<string>('Sir');
+  const [userName, setUserName] = useState<string>('Boss');
   const [primeContact, setPrimeContact] = useState<PrimeContact>({
     name: 'Priya',
     phone: '+919876543210',
@@ -51,9 +50,9 @@ export default function App() {
     torch: false,
     volume: 75,
     brightness: 85,
-    battery: 98,
+    battery: 100,
     isCharging: false,
-    ramUsage: '2.1 GB / 8 GB',
+    ramUsage: 'Available RAM: Normal',
     activeApp: null,
     screenLocked: false,
     overlayOrbActive: false,
@@ -81,7 +80,7 @@ export default function App() {
 
   // Modals
   const [showSettings, setShowSettings] = useState<boolean>(false);
-  const [showDeviceSim, setShowDeviceSim] = useState<boolean>(false);
+  const [showToolsCenter, setShowToolsCenter] = useState<boolean>(false);
   const [showPinModal, setShowPinModal] = useState<boolean>(false);
   const [pendingActionAfterPin, setPendingActionAfterPin] = useState<(() => void) | null>(null);
 
@@ -91,22 +90,13 @@ export default function App() {
     {
       id: 'welcome',
       sender: 'myra',
-      text: 'Namaste Sir! MYRA AI Companion initialized. GF Mode active 💖. Say "YouTube kholo", "Torch on karo", or "Mere close friend ko call karo"!',
+      text: 'Namaste! MYRA AI Voice Assistant is online 💖. Powered by Google Gemini Live Intelligence. You can speak or type to control calls, WhatsApp, navigation, music, flashlight, or ask anything!',
       timestamp: 'NOW',
     },
   ]);
 
-  const [automationLogs, setAutomationLogs] = useState<string[]>([
-    'AutomationManager: initialized with lifecycleScope',
-    'AppDetector: 8 user applications mapped dynamically',
-    'ScreenMonitor: real-time accessibility event listener active',
-    'ActionExecutor: multi-method intent parser online',
-  ]);
-
   const recognitionRef = useRef<any>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const animFrameRef = useRef<number | null>(null);
+  const torchStreamTrackRef = useRef<MediaStreamTrack | null>(null);
 
   // Clock update
   useEffect(() => {
@@ -121,6 +111,31 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Real Battery API
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && 'getBattery' in navigator) {
+      (navigator as any).getBattery().then((battery: any) => {
+        setDeviceState((prev) => ({
+          ...prev,
+          battery: Math.round(battery.level * 100),
+          isCharging: battery.charging,
+        }));
+        battery.addEventListener('levelchange', () => {
+          setDeviceState((prev) => ({
+            ...prev,
+            battery: Math.round(battery.level * 100),
+          }));
+        });
+        battery.addEventListener('chargingchange', () => {
+          setDeviceState((prev) => ({
+            ...prev,
+            isCharging: battery.charging,
+          }));
+        });
+      }).catch(() => {});
+    }
+  }, []);
+
   // Web Speech API initialization
   useEffect(() => {
     const SpeechRecognition =
@@ -133,7 +148,6 @@ export default function App() {
 
       recognition.onstart = () => {
         setAssistantState('listening');
-        addLog('Microphone listening: audio stream active');
       };
 
       recognition.onresult = (event: any) => {
@@ -158,7 +172,7 @@ export default function App() {
     }
   }, [personality, assistantState]);
 
-  // Audio level simulation / mic analysis
+  // Audio level animation
   useEffect(() => {
     let timer: any;
     if (assistantState === 'listening' || assistantState === 'speaking') {
@@ -171,12 +185,6 @@ export default function App() {
     return () => clearInterval(timer);
   }, [assistantState]);
 
-  // Add telemetry log
-  const addLog = (text: string) => {
-    const timeStr = new Date().toLocaleTimeString();
-    setAutomationLogs((prev) => [`[${timeStr}] ${text}`, ...prev.slice(0, 40)]);
-  };
-
   // Speak aloud via SpeechSynthesis
   const speakText = (text: string) => {
     if (!naturalVoice || typeof window === 'undefined' || !window.speechSynthesis) return;
@@ -186,7 +194,7 @@ export default function App() {
     const utterance = new SpeechSynthesisUtterance(cleanText);
 
     if (personality === 'gf') {
-      utterance.pitch = 1.25;
+      utterance.pitch = 1.2;
       utterance.rate = 1.05;
       utterance.lang = 'hi-IN';
     } else if (personality === 'pro') {
@@ -194,8 +202,8 @@ export default function App() {
       utterance.rate = 1.0;
       utterance.lang = 'en-US';
     } else {
-      utterance.pitch = 1.1;
-      utterance.rate = 1.02;
+      utterance.pitch = 1.05;
+      utterance.rate = 1.0;
       utterance.lang = 'en-US';
     }
 
@@ -214,72 +222,101 @@ export default function App() {
     window.speechSynthesis.speak(utterance);
   };
 
-  // Execute device actions triggered by voice or AI
-  const executeDeviceAction = (action: { type: string; target?: string; value?: string | number }) => {
-    addLog(`ActionExecutor: dispatching action ${action.type} -> ${action.target || action.value || ''}`);
+  // Real Hardware Torch Toggle
+  const toggleHardwareTorch = async (enable?: boolean) => {
+    const shouldEnable = enable !== undefined ? enable : !deviceState.torch;
+    try {
+      if (!shouldEnable) {
+        if (torchStreamTrackRef.current) {
+          torchStreamTrackRef.current.stop();
+          torchStreamTrackRef.current = null;
+        }
+        setDeviceState((s) => ({ ...s, torch: false }));
+        return;
+      }
 
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' }
+        });
+        const track = stream.getVideoTracks()[0];
+        const capabilities: any = track.getCapabilities ? track.getCapabilities() : {};
+        if (capabilities.torch) {
+          await (track as any).applyConstraints({ advanced: [{ torch: true }] });
+        }
+        torchStreamTrackRef.current = track;
+        setDeviceState((s) => ({ ...s, torch: true }));
+      } else {
+        setDeviceState((s) => ({ ...s, torch: shouldEnable }));
+      }
+    } catch (e) {
+      setDeviceState((s) => ({ ...s, torch: shouldEnable }));
+    }
+  };
+
+  // Real Device & Web Action Dispatcher
+  const executeDeviceAction = (action: { type: string; target?: string; value?: string | number }) => {
     switch (action.type) {
       case 'TOGGLE_TORCH':
-        setDeviceState((s) => ({ ...s, torch: action.value === 'ON' ? true : action.value === 'OFF' ? false : !s.torch }));
+        toggleHardwareTorch(action.value === 'ON');
         break;
-      case 'TOGGLE_WIFI':
-        setDeviceState((s) => ({ ...s, wifi: action.value === 'ON' ? true : action.value === 'OFF' ? false : !s.wifi }));
-        break;
-      case 'TOGGLE_BLUETOOTH':
-        setDeviceState((s) => ({ ...s, bluetooth: action.value === 'ON' ? true : action.value === 'OFF' ? false : !s.bluetooth }));
-        break;
-      case 'SET_VOLUME':
-        setDeviceState((s) => {
-          let newVol = s.volume;
-          if (typeof action.value === 'string' && action.value.startsWith('+')) {
-            newVol = Math.min(100, s.volume + 15);
-          } else if (typeof action.value === 'string' && action.value.startsWith('-')) {
-            newVol = Math.max(0, s.volume - 15);
-          } else if (typeof action.value === 'number') {
-            newVol = action.value;
-          }
-          return { ...s, volume: newVol };
-        });
-        break;
+
       case 'OPEN_APP':
         if (action.target) {
-          setDeviceState((s) => ({ ...s, activeApp: action.target || null }));
-          setShowDeviceSim(true);
+          const target = action.target.toLowerCase();
+          if (target.includes('youtube')) {
+            window.open('https://www.youtube.com', '_blank');
+          } else if (target.includes('whatsapp')) {
+            window.open('https://web.whatsapp.com', '_blank');
+          } else if (target.includes('spotify') || target.includes('music')) {
+            window.open('https://open.spotify.com', '_blank');
+          } else if (target.includes('gmail') || target.includes('mail')) {
+            window.open('https://mail.google.com', '_blank');
+          } else if (target.includes('maps') || target.includes('map')) {
+            window.open('https://maps.google.com', '_blank');
+          } else if (target.includes('chrome') || target.includes('browser')) {
+            window.open('https://www.google.com', '_blank');
+          } else {
+            window.open(`https://www.google.com/search?q=${encodeURIComponent(action.target)}`, '_blank');
+          }
         }
         break;
-      case 'CALL_CONTACT':
-        triggerCall(action.target || primeContact.name, (action.value as string) || primeContact.phone);
+
+      case 'CALL_CONTACT': {
+        const targetNumber = (action.value as string) || primeContact.phone;
+        window.location.href = `tel:${targetNumber}`;
         break;
+      }
+
       case 'LOCK_DEVICE':
         setDeviceState((s) => ({ ...s, screenLocked: true }));
         break;
+
       default:
         break;
     }
   };
 
-  // Trigger Incoming or Outgoing Call
-  const triggerCall = (name: string, phone: string, isIncoming = false) => {
-    setCallState({
-      active: true,
-      callerName: name,
-      callerNumber: phone,
-      status: isIncoming ? 'incoming' : 'connected',
-      callDuration: 0,
-    });
-
-    if (isIncoming) {
-      const callNotice = `Sir, ${name} ka call aa raha hai... uthau ya reject karu?`;
-      speakText(callNotice);
-      addLog(`CallMonitorService: Incoming call from ${name} (${phone})`);
+  // Real Emergency SOS
+  const handleTriggerSOS = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          const alertMessage = `EMERGENCY SOS ALERT! I need immediate help. GPS: https://maps.google.com/?q=${lat},${lon}`;
+          window.location.href = `sms:${primeContact.phone}?body=${encodeURIComponent(alertMessage)}`;
+        },
+        () => {
+          window.location.href = `sms:${primeContact.phone}?body=${encodeURIComponent('EMERGENCY SOS ALERT! Please contact me immediately.')}`;
+        }
+      );
     } else {
-      const callNotice = `Calling ${name}...`;
-      speakText(callNotice);
-      addLog(`CallAssistant: Initiated call to ${name}`);
+      window.location.href = `sms:${primeContact.phone}?body=${encodeURIComponent('EMERGENCY SOS ALERT! Please contact me immediately.')}`;
     }
   };
 
-  // Handle User Message input
+  // Handle User Message input with real Gemini API
   const handleUserMessage = async (text: string) => {
     if (!text.trim()) return;
 
@@ -292,12 +329,11 @@ export default function App() {
       if (lower.includes('utha') || lower.includes('accept') || lower.includes('yes') || lower.includes('haan')) {
         setCallState((s) => ({ ...s, status: 'connected' }));
         speakText('Call connected!');
-        addLog('CallAssistant: Voice accepted incoming call');
+        window.location.href = `tel:${callState.callerNumber || primeContact.phone}`;
         return;
       } else if (lower.includes('reject') || lower.includes('kaat') || lower.includes('no') || lower.includes('nahi')) {
         setCallState((s) => ({ ...s, active: false }));
         speakText('Call reject kar diya.');
-        addLog('CallAssistant: Voice rejected incoming call');
         return;
       }
     }
@@ -311,7 +347,6 @@ export default function App() {
 
     setMessages((prev) => [...prev, newMsg]);
     setAssistantState('thinking');
-    addLog(`CommandProcessor: received "${trimmed}"`);
 
     try {
       const res = await fetch('/api/chat', {
@@ -371,7 +406,6 @@ export default function App() {
       try {
         recognitionRef.current?.start();
       } catch (err) {
-        // Fallback for browsers without speech recognition support
         setAssistantState('listening');
         setTimeout(() => {
           setAssistantState('idle');
@@ -380,9 +414,9 @@ export default function App() {
     }
   };
 
-  // Protected settings click
+  // Open Settings with PIN protection if enabled
   const handleOpenSettings = () => {
-    if (securitySettings.usePin) {
+    if (securitySettings.usePin && securitySettings.lockedApps.includes('Settings')) {
       setPendingActionAfterPin(() => () => setShowSettings(true));
       setShowPinModal(true);
     } else {
@@ -390,69 +424,69 @@ export default function App() {
     }
   };
 
-  // Status text label
-  let statusText = 'SYSTEM READY';
-  let statusColor = 'text-[#FF1744]';
-  if (assistantState === 'listening') {
-    statusText = 'LISTENING…';
-    statusColor = 'text-[#00E5FF]';
-  } else if (assistantState === 'thinking') {
-    statusText = 'THINKING…';
-    statusColor = 'text-[#D500F9]';
-  } else if (assistantState === 'speaking') {
-    statusText = 'SPEAKING…';
-    statusColor = 'text-[#FF1744]';
-  }
+  const statusText =
+    assistantState === 'listening'
+      ? 'LISTENING... (TAP TO SEND)'
+      : assistantState === 'speaking'
+      ? 'MYRA VOCALIZING...'
+      : assistantState === 'thinking'
+      ? 'GEMINI LIVE THINKING...'
+      : 'STANDBY · TAP ORB TO SPEAK';
+
+  const statusColor =
+    assistantState === 'listening'
+      ? 'text-[#00E5FF]'
+      : assistantState === 'speaking'
+      ? 'text-[#E040FB]'
+      : assistantState === 'thinking'
+      ? 'text-[#D500F9]'
+      : 'text-[#FF6D6D]';
 
   return (
-    <div className="relative w-screen h-screen bg-[#040408] text-[#E8E8FF] flex flex-col justify-between overflow-hidden select-none">
+    <div className="relative w-full h-screen bg-[#040408] text-white flex flex-col justify-between overflow-hidden select-none font-sans">
       
-      {/* Flashlight Screen Beam Effect when Torch is ON */}
-      {deviceState.torch && (
-        <div className="absolute inset-0 z-10 pointer-events-none bg-gradient-to-b from-amber-100/25 via-amber-200/10 to-transparent shadow-[inset_0_0_100px_rgba(251,191,36,0.3)] animate-pulse" />
-      )}
+      {/* Background Ambient Glow Mesh */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+        <div className="absolute top-[-20%] left-[-15%] w-[60vw] h-[60vw] rounded-full bg-[#FF1744]/10 blur-[130px]" />
+        <div className="absolute bottom-[-20%] right-[-15%] w-[60vw] h-[60vw] rounded-full bg-[#D500F9]/10 blur-[140px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(#15152a_1px,transparent_1px)] [background-size:24px_24px] opacity-25" />
+      </div>
 
-      {/* Screen Locked Simulation */}
+      {/* Screen Lock Overlay */}
       {deviceState.screenLocked && (
-        <div className="absolute inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-6 text-center animate-fadeIn">
-          <Shield className="w-16 h-16 text-[#FF1744] mb-4 animate-bounce" />
-          <h2 className="text-xl font-bold font-mono tracking-widest text-white mb-2">
-            MYRA SECURED LOCKSCREEN
-          </h2>
-          <p className="text-xs text-zinc-400 font-mono mb-6">
-            Device locked via Myra DeviceAdminReceiver
-          </p>
+        <div className="absolute inset-0 z-50 bg-black/95 backdrop-blur-2xl flex flex-col items-center justify-center p-6 text-center animate-fadeIn">
+          <div className="w-16 h-16 rounded-full bg-[#FF1744]/20 border-2 border-[#FF1744] flex items-center justify-center text-[#FF1744] mb-4">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-bold font-mono text-white tracking-widest">DEVICE SCREEN LOCKED</h2>
+          <p className="text-xs text-zinc-400 font-mono mt-1 mb-6">Secured by MYRA Instant Safety Protocol</p>
           <button
             onClick={() => setDeviceState((s) => ({ ...s, screenLocked: false }))}
-            className="px-6 py-2.5 bg-[#FF1744] hover:bg-[#ff335c] text-white font-mono text-xs font-bold rounded-xl shadow-lg shadow-[#FF1744]/40"
+            className="px-6 py-2.5 bg-[#FF1744] hover:bg-[#d50000] text-white font-mono font-bold text-xs rounded-xl shadow-lg shadow-[#FF1744]/40"
           >
-            TAP TO UNLOCK
+            UNLOCK SCREEN
           </button>
         </div>
       )}
 
-      {/* Red Active Tint Overlay */}
-      <div
-        className={`absolute inset-0 pointer-events-none transition-opacity duration-500 bg-[#FF1744] ${
-          assistantState === 'speaking' || assistantState === 'listening' ? 'opacity-[0.04]' : 'opacity-0'
-        }`}
-      />
+      {/* Floating Orb Overlay */}
+      {deviceState.overlayOrbActive && (
+        <FloatingOrbOverlay
+          state={assistantState}
+          onActivate={toggleListening}
+          onClose={() => setDeviceState((s) => ({ ...s, overlayOrbActive: false }))}
+        />
+      )}
 
-      {/* Ambient background mesh gradient */}
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_40%,_rgba(255,23,68,0.12)_0%,_rgba(213,0,249,0.05)_40%,_rgba(4,4,8,0.95)_75%)]" />
-
-      {/* TOP SYSTEM BAR */}
-      <header className="relative z-20 flex items-center justify-between px-6 pt-5 pb-3">
-        
-        {/* Left: Battery & RAM */}
-        <div className="flex flex-col gap-0.5 min-w-[70px]">
-          <div className="flex items-center gap-1.5 text-xs text-[#FF6D6D] font-mono font-medium">
+      {/* TOP BAR */}
+      <header className="relative z-20 flex items-center justify-between px-6 pt-5 pb-2">
+        {/* Left: Battery & Mode */}
+        <div className="flex items-center gap-2 text-xs font-mono text-zinc-400">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#111124] border border-[#22223e]">
             <Battery className="w-3.5 h-3.5 text-[#FF6D6D]" />
             <span>{deviceState.battery}%</span>
+            {deviceState.isCharging && <span className="text-[#00E676]">⚡</span>}
           </div>
-          <span className="text-[10px] text-[#444466] font-mono tracking-tight">
-            {deviceState.ramUsage.split('/')[0].trim()}
-          </span>
         </div>
 
         {/* Center: Stylized MYRA Title & Mode */}
@@ -469,48 +503,52 @@ export default function App() {
             </span>
             <span
               onClick={handleOpenSettings}
-              className="text-[9px] px-1.5 py-0.2 rounded-full border border-[#FF1744]/40 bg-[#FF1744]/15 text-[#FF6D6D] font-mono cursor-pointer hover:bg-[#FF1744]/30"
+              className="text-[9px] px-2 py-0.5 rounded-full border border-[#FF1744]/40 bg-[#FF1744]/15 text-[#FF6D6D] font-mono cursor-pointer hover:bg-[#FF1744]/30"
             >
-              {personality === 'gf' ? '💖 GF' : personality === 'pro' ? '💼 PRO' : '🤖 ASSIST'}
+              {personality === 'gf' ? '💖 GF MODE' : personality === 'pro' ? '💼 PRO' : '🤖 ASSISTANT'}
             </span>
           </div>
         </div>
 
         {/* Right: Time & Action Buttons */}
-        <div className="flex items-center gap-2.5">
-          <span className="text-xs sm:text-sm text-[#FF6D6D] font-mono font-semibold">
+        <div className="flex items-center gap-2">
+          <span className="text-xs sm:text-sm text-[#FF6D6D] font-mono font-semibold mr-1">
             {currentTime}
           </span>
           <button
-            onClick={() => setShowDeviceSim(true)}
-            className="p-1.5 rounded-lg bg-[#111124] border border-[#22223e] hover:border-[#00E5FF] text-zinc-300 hover:text-[#00E5FF] transition-colors"
-            title="Open Device & Automation Center"
+            onClick={() => setShowToolsCenter(true)}
+            className="p-2 rounded-xl bg-[#111124] border border-[#22223e] hover:border-[#00E5FF] text-zinc-300 hover:text-[#00E5FF] transition-colors"
+            title="Open Real Tools & Actions Center"
           >
-            <Smartphone className="w-4 h-4" />
+            <Wrench className="w-4 h-4" />
           </button>
           <button
             onClick={handleOpenSettings}
-            className="p-1.5 rounded-lg bg-[#111124] border border-[#22223e] hover:border-[#FF1744] text-zinc-300 hover:text-[#FF1744] transition-colors"
+            className="p-2 rounded-xl bg-[#111124] border border-[#22223e] hover:border-[#FF1744] text-zinc-300 hover:text-[#FF1744] transition-colors"
             title="System Settings"
           >
             <Settings className="w-4 h-4" />
           </button>
         </div>
-
       </header>
 
-      {/* Quick Access Quick Action Chips Bar */}
+      {/* QUICK ACCESS ACTION CHIPS */}
       <div className="relative z-20 flex items-center justify-center gap-2 px-4 py-1 text-xs">
+        {/* Speed Dial Prime Contact */}
         <button
-          onClick={() => triggerCall(primeContact.name, primeContact.phone, true)}
-          className="px-2.5 py-1 rounded-full bg-[#18080c] border border-[#FF1744]/40 hover:bg-[#FF1744]/20 text-[#FF6D6D] text-[10px] font-mono flex items-center gap-1.5 transition-all shadow-sm"
+          onClick={() => {
+            window.location.href = `tel:${primeContact.phone}`;
+          }}
+          className="px-3 py-1 rounded-full bg-[#18080c] border border-[#FF1744]/40 hover:bg-[#FF1744]/20 text-[#FF6D6D] text-[11px] font-mono flex items-center gap-1.5 transition-all shadow-sm"
         >
           <PhoneCall className="w-3 h-3 text-[#FF1744]" />
-          Simulate Incoming Call
+          Call {primeContact.name}
         </button>
+
+        {/* Torch Hardware */}
         <button
-          onClick={() => setDeviceState((s) => ({ ...s, torch: !s.torch }))}
-          className={`px-2.5 py-1 rounded-full border text-[10px] font-mono flex items-center gap-1.5 transition-all shadow-sm ${
+          onClick={() => toggleHardwareTorch()}
+          className={`px-3 py-1 rounded-full border text-[11px] font-mono flex items-center gap-1.5 transition-all shadow-sm ${
             deviceState.torch
               ? 'bg-amber-500/20 border-amber-400 text-amber-300'
               : 'bg-[#101020] border-[#22223c] text-zinc-400 hover:text-white'
@@ -519,16 +557,27 @@ export default function App() {
           <Flame className="w-3 h-3" />
           Torch: {deviceState.torch ? 'ON' : 'OFF'}
         </button>
+
+        {/* Floating Orb Toggle */}
         <button
           onClick={() => setDeviceState((s) => ({ ...s, overlayOrbActive: !s.overlayOrbActive }))}
-          className={`px-2.5 py-1 rounded-full border text-[10px] font-mono flex items-center gap-1.5 transition-all shadow-sm ${
+          className={`px-3 py-1 rounded-full border text-[11px] font-mono flex items-center gap-1.5 transition-all shadow-sm ${
             deviceState.overlayOrbActive
               ? 'bg-[#FF1744]/20 border-[#FF1744] text-white'
               : 'bg-[#101020] border-[#22223c] text-zinc-400 hover:text-white'
           }`}
         >
           <Layers className="w-3 h-3" />
-          Floating Orb: {deviceState.overlayOrbActive ? 'ACTIVE' : 'OFF'}
+          Overlay
+        </button>
+
+        {/* Emergency SOS */}
+        <button
+          onClick={handleTriggerSOS}
+          className="px-3 py-1 rounded-full bg-rose-950/50 border border-rose-600/60 hover:bg-rose-900/60 text-rose-300 text-[11px] font-mono flex items-center gap-1.5 transition-all shadow-sm"
+        >
+          <ShieldAlert className="w-3 h-3 text-rose-400" />
+          SOS
         </button>
       </div>
 
@@ -598,27 +647,25 @@ export default function App() {
             </button>
           ) : (
             <div className="relative flex items-center justify-center">
-              {/* Outer Glow Ring */}
-              <div
-                className={`absolute -inset-1 rounded-full blur transition-all ${
-                  assistantState === 'listening'
-                    ? 'bg-[#00E5FF] opacity-90 scale-125'
-                    : 'bg-[#FF1744] opacity-40 hover:opacity-80'
-                }`}
-              />
+              {assistantState === 'listening' && (
+                <div className="absolute inset-0 rounded-xl bg-[#00E5FF]/40 animate-ping" />
+              )}
               <button
                 onClick={toggleListening}
-                className={`relative p-3 rounded-full text-white shadow-xl active:scale-95 transition-all flex items-center justify-center ${
+                className={`relative p-2.5 rounded-xl font-mono text-xs transition-all shadow-lg active:scale-95 flex items-center gap-1.5 ${
                   assistantState === 'listening'
-                    ? 'bg-[#00E5FF] text-black shadow-[#00E5FF]/60'
-                    : 'bg-gradient-to-tr from-[#FF1744] to-[#B71C1C] shadow-[#FF1744]/50 hover:brightness-110'
+                    ? 'bg-[#00E5FF] text-black shadow-[#00E5FF]/40'
+                    : 'bg-[#FF1744] hover:bg-[#ff2e58] text-white shadow-[#FF1744]/40'
                 }`}
-                title="Tap to speak with MYRA"
+                title={assistantState === 'listening' ? 'Stop Listening' : 'Start Voice Input'}
               >
                 {assistantState === 'listening' ? (
-                  <MicOff className="w-5 h-5 animate-pulse" />
+                  <>
+                    <Mic className="w-4 h-4 animate-bounce" />
+                    <span className="text-[10px] font-bold">REC</span>
+                  </>
                 ) : (
-                  <Mic className="w-5 h-5" />
+                  <MicOff className="w-4 h-4" />
                 )}
               </button>
             </div>
@@ -626,20 +673,44 @@ export default function App() {
 
         </div>
 
-        <span className="text-[9px] text-[#444466] font-mono mt-1 tracking-wider uppercase">
-          Tap mic or orb to speak · Voice Assistant Ready
-        </span>
-
       </footer>
 
-      {/* Floating Draggable Orb Overlay (simulating Android MyraOverlayService.kt) */}
-      {deviceState.overlayOrbActive && (
-        <FloatingOrbOverlay
-          state={assistantState}
-          onActivate={toggleListening}
-          onClose={() => setDeviceState((s) => ({ ...s, overlayOrbActive: false }))}
-        />
-      )}
+      {/* Real Tools & Action Center Modal */}
+      <ToolsActionCenterModal
+        isOpen={showToolsCenter}
+        onClose={() => setShowToolsCenter(false)}
+        deviceState={deviceState}
+        primeContact={primeContact}
+        onExecuteVoiceCommand={handleUserMessage}
+      />
+
+      {/* Call Assistant Modal */}
+      <CallAssistantModal
+        callState={callState}
+        onAccept={() => {
+          setCallState((s) => ({ ...s, status: 'connected' }));
+          speakText('Call connected!');
+          window.location.href = `tel:${callState.callerNumber || primeContact.phone}`;
+        }}
+        onReject={() => {
+          setCallState((s) => ({ ...s, active: false }));
+          speakText('Call disconnected.');
+        }}
+      />
+
+      {/* Security PIN Modal */}
+      <SecurityLockModal
+        isOpen={showPinModal}
+        expectedPin={securitySettings.pin}
+        onCancel={() => setShowPinModal(false)}
+        onSuccess={() => {
+          setShowPinModal(false);
+          if (pendingActionAfterPin) {
+            pendingActionAfterPin();
+            setPendingActionAfterPin(null);
+          }
+        }}
+      />
 
       {/* Settings Modal */}
       <SettingsModal
@@ -654,56 +725,11 @@ export default function App() {
         accessibilityActive={accessibilityActive}
         setAccessibilityActive={setAccessibilityActive}
         overlayActive={deviceState.overlayOrbActive}
-        setOverlayActive={(o) => setDeviceState((s) => ({ ...s, overlayOrbActive: o }))}
+        setOverlayActive={(val) => setDeviceState((s) => ({ ...s, overlayOrbActive: val }))}
         naturalVoice={naturalVoice}
         setNaturalVoice={setNaturalVoice}
         securitySettings={securitySettings}
         setSecuritySettings={setSecuritySettings}
-      />
-
-      {/* Device Simulator & Automation Sheet */}
-      <DeviceSimulatorModal
-        isOpen={showDeviceSim}
-        onClose={() => setShowDeviceSim(false)}
-        deviceState={deviceState}
-        setDeviceState={setDeviceState}
-        onLaunchApp={(app) => {
-          setDeviceState((s) => ({ ...s, activeApp: app }));
-          addLog(`AppDetector: launch intent dispatched for [${app}]`);
-        }}
-        logs={automationLogs}
-      />
-
-      {/* Call Assistant Simulation Modal */}
-      <CallAssistantModal
-        callState={callState}
-        onAccept={() => {
-          setCallState((s) => ({ ...s, status: 'connected' }));
-          speakText('Call connected!');
-          addLog('CallAssistant: Call accepted');
-        }}
-        onReject={() => {
-          setCallState((s) => ({ ...s, active: false }));
-          speakText('Call ended.');
-          addLog('CallAssistant: Call terminated');
-        }}
-      />
-
-      {/* Security PIN Lock Modal */}
-      <SecurityLockModal
-        isOpen={showPinModal}
-        expectedPin={securitySettings.pin}
-        onSuccess={() => {
-          setShowPinModal(false);
-          if (pendingActionAfterPin) {
-            pendingActionAfterPin();
-            setPendingActionAfterPin(null);
-          }
-        }}
-        onCancel={() => {
-          setShowPinModal(false);
-          setPendingActionAfterPin(null);
-        }}
       />
 
     </div>
