@@ -19,14 +19,7 @@ const apiKey = process.env.GEMINI_API_KEY;
 let aiClient: GoogleGenAI | null = null;
 if (apiKey) {
   try {
-    aiClient = new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        },
-      },
-    });
+    aiClient = new GoogleGenAI({ apiKey });
   } catch (err) {
     console.warn('[MYRA Server] Failed to initialize GoogleGenAI with key:', err);
   }
@@ -145,7 +138,7 @@ app.get('/api/status', (req, res) => {
   res.json({
     status: 'online',
     version: '2.0.0',
-    model: aiClient ? 'gemini-3.8-flash' : 'local-myra-core',
+    model: aiClient ? 'gemini-2.5-flash' : 'local-myra-core',
     hasKey: Boolean(apiKey),
     capabilities: ['voice-recognition', 'tts-synthesis', 'device-automation', 'screen-vision', 'call-assistant']
   });
@@ -204,7 +197,7 @@ Keep answers concise (1-3 sentences) suitable for audio readout.`;
       });
 
       const response = await aiClient.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-2.5-flash',
         contents,
         config: {
           systemInstruction: systemPrompt,
