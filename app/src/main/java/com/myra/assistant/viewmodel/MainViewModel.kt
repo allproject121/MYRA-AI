@@ -40,6 +40,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _commandResult = MutableLiveData<String?>()
     val commandResult: LiveData<String?> = _commandResult
 
+    val toolRouter = com.myra.assistant.tools.ToolRouter(application)
+    val permissionsService = com.myra.assistant.service.PermissionsService(application)
+
     private var isTorchOn = false
 
     private val screenDriver = AccessibilityScreenDriver()
@@ -201,6 +204,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 AppCommand.TYPE_CLOSE_APP -> closeApp()
                 AppCommand.TYPE_KILL_TASK -> {
                     _commandResult.postValue("Background task aur automated actions rok diye gaye.")
+                }
+                else -> {
+                    // Route through IRIS-MX Master ToolRouter
+                    val execution = toolRouter.dispatch(command.type, command.params)
+                    _commandResult.postValue(execution.message)
                 }
             }
         }

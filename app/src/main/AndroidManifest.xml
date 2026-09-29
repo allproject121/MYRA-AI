@@ -106,6 +106,17 @@
             android:exported="false"
             android:foregroundServiceType="phoneCall" />
 
+        <!-- Notification Listener Engine -->
+        <service
+            android:name=".service.MyraNotificationListenerService"
+            android:label="MYRA Notification Engine"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <!-- Accessibility Service -->
         <service
             android:name=".service.AccessibilityHelperService"

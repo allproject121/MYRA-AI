@@ -266,6 +266,48 @@ object CommandParser {
             }
         }
 
+        // 16. Core Memory (Remember & Recall)
+        if (clean.startsWith("remember ") || clean.startsWith("yaad rakhna ") || clean.startsWith("note down ")) {
+            val content = clean.removePrefix("remember ").removePrefix("yaad rakhna ").removePrefix("note down ").trim()
+            val parts = if (content.contains(" is ")) content.split(" is ", limit = 2)
+            else if (content.contains(" hai ")) content.split(" hai ", limit = 2)
+            else listOf("note", content)
+            return AppCommand("save_core_memory", mapOf("key" to parts[0].trim(), "value" to (parts.getOrNull(1) ?: parts[0]).trim()))
+        }
+        if (clean.startsWith("what is my ") || clean.startsWith("mera ") && clean.endsWith(" kya hai")) {
+            val key = clean.removePrefix("what is my ").removePrefix("mera ").removeSuffix(" kya hai").trim()
+            return AppCommand("access_core_memory", mapOf("key" to key))
+        }
+
+        // 17. Calendar & Scheduling
+        if (clean.contains("calendar") || clean.contains("schedule check") || clean.contains("aaj ka schedule") || clean.contains("what's on my calendar")) {
+            return AppCommand("check_schedule", mapOf("timeframe" to "today"))
+        }
+        if (clean.contains("schedule meeting") || clean.contains("meeting schedule") || clean.contains("schedule a meeting") || clean.contains("schedule event")) {
+            val title = extractTargetName(clean, listOf("schedule", "meeting", "titled", "event", "karo"))
+            return AppCommand("schedule_new_event", mapOf("title" to if (title.isNotBlank()) title else "Team Sync", "start_time" to "2 hours from now", "duration_minutes" to "30"))
+        }
+
+        // 18. Media Playback Controls
+        if (clean == "pause music" || clean == "pause" || clean == "music roko" || clean == "stop music") {
+            return AppCommand("control_media_playback", mapOf("action" to "pause"))
+        }
+        if (clean == "resume music" || clean == "play music" || clean == "chalao" || clean == "play") {
+            return AppCommand("control_media_playback", mapOf("action" to "play"))
+        }
+        if (clean == "next song" || clean == "skip song" || clean == "agla gana" || clean == "next") {
+            return AppCommand("control_media_playback", mapOf("action" to "next"))
+        }
+        if (clean == "previous song" || clean == "pichhla gana" || clean == "previous") {
+            return AppCommand("control_media_playback", mapOf("action" to "previous"))
+        }
+
+        // 19. Notifications Management
+        if (clean.contains("read notifications") || clean.contains("read latest") || clean.contains("notification padho") || clean.contains("messages check karo")) {
+            val app = if (clean.contains("whatsapp")) "whatsapp" else if (clean.contains("instagram")) "instagram" else if (clean.contains("telegram")) "telegram" else "all"
+            return AppCommand("manage_notification_listener", mapOf("action" to "read_latest", "target_app" to app))
+        }
+
         return null
     }
 

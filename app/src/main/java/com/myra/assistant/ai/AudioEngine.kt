@@ -49,6 +49,10 @@ class AudioEngine(private val context: Context) {
     private var recordJob: Job? = null
     private var playJob: Job? = null
 
+    // IRIS-MX AEC3 acoustic echo suppression engine
+    private val aecEngine = IrisAcousticEchoCancellationEngine(MIC_SAMPLE_RATE, CHUNK_SIZE / 2)
+    private var lastRenderFrame: ShortArray? = null
+
     @SuppressLint("MissingPermission")
     fun startRecording() {
         if (isRecording) return
@@ -78,17 +82,47 @@ class AudioEngine(private val context: Context) {
 
             recordJob = scope.launch {
                 val buffer = ByteArray(CHUNK_SIZE)
+                val captureShorts = ShortArray(CHUNK_SIZE / 2)
+                val processedShorts = ShortArray(CHUNK_SIZE / 2)
+
                 while (isActive && isRecording) {
                     val read = audioRecord?.read(buffer, 0, buffer.size) ?: 0
                     if (read > 0) {
+                        // Convert byte buffer to 16-bit PCM shorts for AEC
+                        val samples = read / 2
+                        for (i in 0 until samples) {
+                            val low = buffer[i * 2].toInt() and 0xFF
+                            val high = buffer[i * 2 + 1].toInt()
+                            captureShorts[i] = ((high shl 8) or low).toShort()
+                        }
+
+                        // Run IRIS-MX AEC frame processor
+                        val doubleTalk = aecEngine.processAudioFrames(
+                            captureShorts,
+                            lastRenderFrame,
+                            processedShorts,
+                            isSpeaking
+                        )
+
+                        // If user starts speaking over the assistant (double-talk), trigger interruption
+                        if (doubleTalk && isSpeaking) {
+                            interruptAndClear()
+                        }
+
                         // Calculate RMS Amplitude
                         val rms = calculateRms(buffer, read)
                         onAmplitudeChanged?.invoke(rms)
 
-                        // Do NOT send mic audio while MYRA is speaking (echo suppression) or when muted
-                        if (!isSpeaking && !isMuted) {
-                            val chunk = buffer.copyOf(read)
-                            onAudioChunkRecorded?.invoke(chunk)
+                        // Do NOT send mic audio while MYRA is speaking (unless double-talk) or when muted
+                        if ((!isSpeaking || doubleTalk) && !isMuted) {
+                            // Re-encode processed shorts back to byte array
+                            val outBytes = ByteArray(samples * 2)
+                            for (i in 0 until samples) {
+                                val s = processedShorts[i].toInt()
+                                outBytes[i * 2] = (s and 0xFF).toByte()
+                                outBytes[i * 2 + 1] = ((s shr 8) and 0xFF).toByte()
+                            }
+                            onAudioChunkRecorded?.invoke(outBytes)
                         }
                     }
                 }
