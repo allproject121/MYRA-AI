@@ -18,7 +18,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingTop="36dp">
+        android:paddingTop="32dp">
 
         <!-- Top Bar -->
         <LinearLayout
@@ -26,8 +26,8 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingHorizontal="20dp"
-            android:paddingVertical="8dp">
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="6dp">
 
             <!-- System Info (Battery / RAM) -->
             <LinearLayout
@@ -52,7 +52,7 @@
                     android:layout_height="wrap_content"
                     android:text="RAM: 4.2GB"
                     android:textColor="@color/text_secondary"
-                    android:textSize="11sp"
+                    android:textSize="10sp"
                     android:fontFamily="monospace" />
             </LinearLayout>
 
@@ -68,22 +68,23 @@
                     android:layout_height="wrap_content"
                     android:text="MYRA"
                     android:textColor="@color/primary_red"
-                    android:textSize="22sp"
+                    android:textSize="20sp"
                     android:textStyle="bold"
-                    android:letterSpacing="0.25"
+                    android:letterSpacing="0.2"
                     android:fontFamily="sans-serif-black" />
 
                 <TextView
+                    android:id="@+id/personalityBadgeText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="AI COMPANION"
-                    android:textColor="@color/text_secondary"
+                    android:background="@drawable/bg_badge"
+                    android:text="💖 GF MODE"
+                    android:textColor="@color/white"
                     android:textSize="9sp"
-                    android:letterSpacing="0.2"
                     android:fontFamily="monospace" />
             </LinearLayout>
 
-            <!-- Time and Settings -->
+            <!-- Time, Guide and Settings -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -95,21 +96,196 @@
                     android:id="@+id/timeText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="12dp"
+                    android:layout_marginEnd="8dp"
                     android:text="12:00"
                     android:textColor="@color/primary_red"
                     android:textSize="12sp"
                     android:fontFamily="monospace" />
 
                 <ImageButton
+                    android:id="@+id/guideBtn"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="4dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_guide"
+                    android:contentDescription="Voice Commands Guide" />
+
+                <ImageButton
                     android:id="@+id/settingsBtn"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:src="@drawable/ic_settings"
                     android:contentDescription="Settings" />
             </LinearLayout>
         </LinearLayout>
+
+        <!-- Quick Action Toolbar (Strip) -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="4dp">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <!-- Tools -->
+                <LinearLayout
+                    android:id="@+id/actionToolsBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_action_chip"
+                    android:gravity="center_vertical"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="10dp">
+                    <ImageView
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:src="@drawable/ic_tools" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:text="Tools"
+                        android:textColor="@color/white"
+                        android:textSize="11sp"
+                        android:fontFamily="sans-serif-bold" />
+                </LinearLayout>
+
+                <!-- Security -->
+                <LinearLayout
+                    android:id="@+id/actionSecurityBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_action_chip"
+                    android:gravity="center_vertical"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="10dp">
+                    <ImageView
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:src="@drawable/ic_shield" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:text="Security"
+                        android:textColor="@color/white"
+                        android:textSize="11sp"
+                        android:fontFamily="sans-serif-bold" />
+                </LinearLayout>
+
+                <!-- Utilities -->
+                <LinearLayout
+                    android:id="@+id/actionUtilitiesBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_action_chip"
+                    android:gravity="center_vertical"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="10dp">
+                    <ImageView
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:src="@drawable/ic_utilities" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:text="Utilities"
+                        android:textColor="@color/white"
+                        android:textSize="11sp"
+                        android:fontFamily="sans-serif-bold" />
+                </LinearLayout>
+
+                <!-- Social Agent -->
+                <LinearLayout
+                    android:id="@+id/actionSocialBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_action_chip"
+                    android:gravity="center_vertical"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="10dp">
+                    <ImageView
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:src="@drawable/ic_social" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:text="Social Agent"
+                        android:textColor="@color/white"
+                        android:textSize="11sp"
+                        android:fontFamily="sans-serif-bold" />
+                </LinearLayout>
+
+                <!-- Call Assistant -->
+                <LinearLayout
+                    android:id="@+id/actionCallBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_action_chip"
+                    android:gravity="center_vertical"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="10dp">
+                    <ImageView
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:src="@drawable/ic_call" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:text="Call Sim"
+                        android:textColor="@color/white"
+                        android:textSize="11sp"
+                        android:fontFamily="sans-serif-bold" />
+                </LinearLayout>
+
+                <!-- Emergency SOS -->
+                <LinearLayout
+                    android:id="@+id/actionSosBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:background="@drawable/bg_action_chip"
+                    android:gravity="center_vertical"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="10dp">
+                    <ImageView
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:src="@drawable/ic_sos" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:text="SOS"
+                        android:textColor="@color/primary_red"
+                        android:textSize="11sp"
+                        android:fontFamily="sans-serif-bold" />
+                </LinearLayout>
+
+            </LinearLayout>
+        </HorizontalScrollView>
 
         <!-- Center Orb Area -->
         <FrameLayout
@@ -126,25 +302,25 @@
                 <!-- Animated Canvas Orb -->
                 <com.myra.assistant.ui.main.OrbAnimationView
                     android:id="@+id/orbView"
-                    android:layout_width="260dp"
-                    android:layout_height="260dp" />
+                    android:layout_width="180dp"
+                    android:layout_height="180dp" />
 
                 <!-- Waveform Bars -->
                 <com.myra.assistant.ui.main.WaveformView
                     android:id="@+id/waveformView"
-                    android:layout_width="200dp"
-                    android:layout_height="36dp"
-                    android:layout_marginTop="8dp" />
+                    android:layout_width="180dp"
+                    android:layout_height="28dp"
+                    android:layout_marginTop="6dp" />
 
                 <!-- Status Text -->
                 <TextView
                     android:id="@+id/statusText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="Tap karke bolo 💬"
+                    android:layout_marginTop="4dp"
+                    android:text="Tap mic ya bol kar batao 💬"
                     android:textColor="@color/text_secondary"
-                    android:textSize="13sp"
+                    android:textSize="12sp"
                     android:fontFamily="sans-serif-medium" />
             </LinearLayout>
         </FrameLayout>
@@ -154,45 +330,164 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingHorizontal="16dp"
-            android:paddingBottom="24dp">
+            android:paddingHorizontal="14dp"
+            android:paddingBottom="12dp">
 
             <!-- Chat Transcript Recycler -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/chatRecycler"
                 android:layout_width="match_parent"
-                android:layout_height="180dp"
-                android:layout_marginBottom="16dp"
+                android:layout_height="130dp"
+                android:layout_marginBottom="6dp"
                 android:scrollbars="vertical" />
 
-            <!-- Mic Control Button -->
-            <FrameLayout
+            <!-- Suggestion Chips Strip -->
+            <HorizontalScrollView
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content">
+                android:layout_height="wrap_content"
+                android:scrollbars="none"
+                android:layout_marginBottom="8dp">
 
                 <LinearLayout
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:gravity="center"
-                    android:orientation="vertical">
-
-                    <ImageButton
-                        android:id="@+id/micButton"
-                        android:layout_width="72dp"
-                        android:layout_height="72dp"
-                        android:background="@drawable/bg_mic_button"
-                        android:src="@drawable/ic_mic_off"
-                        android:contentDescription="Microphone Toggle" />
+                    android:orientation="horizontal">
 
                     <TextView
+                        android:id="@+id/chipWhatsapp"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="Long press to stop / interrupt"
-                        android:textColor="@color/text_hint"
-                        android:textSize="11sp" />
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/bg_badge"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:text="WhatsApp kholo 💬"
+                        android:textColor="@color/white"
+                        android:textSize="10sp" />
+
+                    <TextView
+                        android:id="@+id/chipYoutube"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/bg_badge"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:text="YouTube chalao 🎵"
+                        android:textColor="@color/white"
+                        android:textSize="10sp" />
+
+                    <TextView
+                        android:id="@+id/chipCallMom"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/bg_badge"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:text="Mummy ko call 📞"
+                        android:textColor="@color/white"
+                        android:textSize="10sp" />
+
+                    <TextView
+                        android:id="@+id/chipTorch"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/bg_badge"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:text="Torch on 💡"
+                        android:textColor="@color/white"
+                        android:textSize="10sp" />
+
+                    <TextView
+                        android:id="@+id/chipBattery"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/bg_badge"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:text="Battery kitni hai 🔋"
+                        android:textColor="@color/white"
+                        android:textSize="10sp" />
+
+                    <TextView
+                        android:id="@+id/chipSecurity"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_badge"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:text="Security sentry 🛡️"
+                        android:textColor="@color/white"
+                        android:textSize="10sp" />
                 </LinearLayout>
-            </FrameLayout>
+            </HorizontalScrollView>
+
+            <!-- Bottom Command Input Bar -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <!-- Speaker TTS Toggle Button -->
+                <ImageButton
+                    android:id="@+id/speakerToggleBtn"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_action_chip"
+                    android:contentDescription="Voice TTS Toggle"
+                    android:src="@drawable/ic_volume_up" />
+
+                <!-- Text Input Field -->
+                <EditText
+                    android:id="@+id/chatInputField"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_input_field"
+                    android:hint="Bol ya likh kar batao..."
+                    android:imeOptions="actionSend"
+                    android:inputType="textCapSentences"
+                    android:maxLines="2"
+                    android:paddingHorizontal="14dp"
+                    android:textColor="@color/white"
+                    android:textColorHint="@color/text_hint"
+                    android:textSize="13sp" />
+
+                <!-- Send Button -->
+                <ImageButton
+                    android:id="@+id/sendButton"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_action_chip"
+                    android:contentDescription="Send Message"
+                    android:src="@drawable/ic_send" />
+
+                <!-- Mic Control Button -->
+                <ImageButton
+                    android:id="@+id/micButton"
+                    android:layout_width="52dp"
+                    android:layout_height="52dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_mic_button"
+                    android:contentDescription="Microphone Toggle"
+                    android:src="@drawable/ic_mic_off" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:text="Tap mic to speak · Long press to stop / interrupt"
+                android:textColor="@color/text_hint"
+                android:textSize="10sp" />
         </LinearLayout>
     </LinearLayout>
 

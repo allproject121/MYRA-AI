@@ -17,69 +17,95 @@ import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.view.View
+import android.view.inputmethod.EditorInfo
+import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.myra.assistant.R
 import com.myra.assistant.ai.AudioEngine
-import com.myra.assistant.ai.CommandParser
 import com.myra.assistant.ai.GeminiLiveClient
+import com.myra.assistant.ai.MyraAiEngine
+import com.myra.assistant.model.AppCommand
 import com.myra.assistant.service.CallMonitorService
-import com.myra.assistant.service.MyraOverlayService
 import com.myra.assistant.service.PermissionManager
+import com.myra.assistant.ui.dialogs.*
 import com.myra.assistant.ui.settings.SettingsActivity
 import com.myra.assistant.viewmodel.MainViewModel
+import kotlinx.coroutines.launch
+import org.json.JSONArray
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private lateinit var redOverlay: View
     private lateinit var batteryText: TextView
     private lateinit var ramText: TextView
     private lateinit var timeText: TextView
+    private lateinit var personalityBadgeText: TextView
+    private lateinit var guideBtn: ImageButton
     private lateinit var settingsBtn: ImageButton
+
+    // Quick Action Bar
+    private lateinit var actionToolsBtn: View
+    private lateinit var actionSecurityBtn: View
+    private lateinit var actionUtilitiesBtn: View
+    private lateinit var actionSocialBtn: View
+    private lateinit var actionCallBtn: View
+    private lateinit var actionSosBtn: View
+
+    // Center Views
     private lateinit var orbView: OrbAnimationView
     private lateinit var waveformView: WaveformView
     private lateinit var statusText: TextView
+
+    // Chat & Input Views
     private lateinit var chatRecycler: RecyclerView
+    private lateinit var chatInputField: EditText
+    private lateinit var sendButton: ImageButton
     private lateinit var micButton: ImageButton
+    private lateinit var speakerToggleBtn: ImageButton
+
+    // Suggestion Chips
+    private lateinit var chipWhatsapp: TextView
+    private lateinit var chipYoutube: TextView
+    private lateinit var chipCallMom: TextView
+    private lateinit var chipTorch: TextView
+    private lateinit var chipBattery: TextView
+    private lateinit var chipSecurity: TextView
 
     private lateinit var chatAdapter: ChatAdapter
     private val viewModel: MainViewModel by viewModels()
+    private val aiEngine = MyraAiEngine()
+
+    private var tts: TextToSpeech? = null
+    private var isTtsMuted = false
+    private var isTtsReady = false
 
     private var geminiLive: GeminiLiveClient? = null
     private var audioEngine: AudioEngine? = null
-
-    private val inputBuffer = StringBuilder()
-    private val outputBuffer = StringBuilder()
-    private val handler = Handler(Looper.getMainLooper())
-
-    private var isInCallMode = false
     private var speechRecognizer: SpeechRecognizer? = null
+    private var isListening = false
 
-    private val requiredPermissions = arrayOf(
-        Manifest.permission.RECORD_AUDIO,
-        Manifest.permission.CALL_PHONE,
-        Manifest.permission.READ_CONTACTS,
-        Manifest.permission.SEND_SMS,
-        Manifest.permission.READ_PHONE_STATE,
-        Manifest.permission.CAMERA,
-        Manifest.permission.MODIFY_AUDIO_SETTINGS
-    )
+    private val handler = Handler(Looper.getMainLooper())
+    private var isInCallMode = false
 
     private val callEndedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             isInCallMode = false
             audioEngine?.isMuted = false
-            orbView.setState(OrbAnimationView.OrbState.LISTENING)
+            orbView.setState(OrbAnimationView.OrbState.IDLE)
             statusText.text = "Sun rahi hoon..."
         }
     }
@@ -89,6 +115,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         initViews()
+        initTts()
         checkPermissions()
         startSystemServices()
         startStatusUpdates()
@@ -100,11 +127,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         handler.postDelayed({
-            initGeminiLive()
-        }, 300)
+            initGeminiLiveIfConfigured()
+        }, 500)
 
         handleIncomingCallIntent(intent)
         observeViewModel()
+        sendInitialGreeting()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -118,12 +146,33 @@ class MainActivity : AppCompatActivity() {
         batteryText = findViewById(R.id.batteryText)
         ramText = findViewById(R.id.ramText)
         timeText = findViewById(R.id.timeText)
+        personalityBadgeText = findViewById(R.id.personalityBadgeText)
+        guideBtn = findViewById(R.id.guideBtn)
         settingsBtn = findViewById(R.id.settingsBtn)
+
+        actionToolsBtn = findViewById(R.id.actionToolsBtn)
+        actionSecurityBtn = findViewById(R.id.actionSecurityBtn)
+        actionUtilitiesBtn = findViewById(R.id.actionUtilitiesBtn)
+        actionSocialBtn = findViewById(R.id.actionSocialBtn)
+        actionCallBtn = findViewById(R.id.actionCallBtn)
+        actionSosBtn = findViewById(R.id.actionSosBtn)
+
         orbView = findViewById(R.id.orbView)
         waveformView = findViewById(R.id.waveformView)
         statusText = findViewById(R.id.statusText)
+
         chatRecycler = findViewById(R.id.chatRecycler)
+        chatInputField = findViewById(R.id.chatInputField)
+        sendButton = findViewById(R.id.sendButton)
         micButton = findViewById(R.id.micButton)
+        speakerToggleBtn = findViewById(R.id.speakerToggleBtn)
+
+        chipWhatsapp = findViewById(R.id.chipWhatsapp)
+        chipYoutube = findViewById(R.id.chipYoutube)
+        chipCallMom = findViewById(R.id.chipCallMom)
+        chipTorch = findViewById(R.id.chipTorch)
+        chipBattery = findViewById(R.id.chipBattery)
+        chipSecurity = findViewById(R.id.chipSecurity)
 
         chatAdapter = ChatAdapter()
         val layoutManager = LinearLayoutManager(this).apply {
@@ -132,18 +181,363 @@ class MainActivity : AppCompatActivity() {
         chatRecycler.layoutManager = layoutManager
         chatRecycler.adapter = chatAdapter
 
+        setupListeners()
+        updatePersonalityBadge()
+    }
+
+    private fun setupListeners() {
         settingsBtn.setOnClickListener {
             val intent = Intent(this, SettingsActivity::class.java)
             startActivity(intent)
         }
 
+        guideBtn.setOnClickListener {
+            ToolsGuideDialog(this).show()
+        }
+
+        // Quick Action Bar
+        actionToolsBtn.setOnClickListener {
+            ToolsActionCenterDialog(this, viewModel) { notice ->
+                statusText.text = notice
+            }.show()
+        }
+
+        actionSecurityBtn.setOnClickListener {
+            SecurityModeDialog(
+                this,
+                onIntruderAlertTriggered = {
+                    triggerIntruderAlert()
+                },
+                onPinVerified = { success ->
+                    if (success) {
+                        statusText.text = "Device unlocked!"
+                    }
+                }
+            ).show()
+        }
+
+        actionUtilitiesBtn.setOnClickListener {
+            PhoneUtilitiesDialog(this) { notice ->
+                statusText.text = notice
+            }.show()
+        }
+
+        actionSocialBtn.setOnClickListener {
+            SocialMediaAgentDialog(this, viewModel) { notice ->
+                statusText.text = notice
+            }.show()
+        }
+
+        actionCallBtn.setOnClickListener {
+            CallAssistantDialog(
+                this,
+                viewModel,
+                onSpeakRequest = { prompt ->
+                    speakOut(prompt)
+                },
+                onNotice = { notice ->
+                    statusText.text = notice
+                }
+            ).show()
+        }
+
+        actionSosBtn.setOnClickListener {
+            viewModel.executeCommand(AppCommand(AppCommand.TYPE_EMERGENCY_SOS))
+            statusText.text = "🚨 SOS Triggered!"
+        }
+
+        // Suggestion Chips
+        chipWhatsapp.setOnClickListener { handleUserTextMessage("WhatsApp kholo") }
+        chipYoutube.setOnClickListener { handleUserTextMessage("YouTube chalao") }
+        chipCallMom.setOnClickListener { handleUserTextMessage("Mummy ko call karo") }
+        chipTorch.setOnClickListener { handleUserTextMessage("Torch on karo") }
+        chipBattery.setOnClickListener { handleUserTextMessage("Battery kitni hai") }
+        chipSecurity.setOnClickListener { handleUserTextMessage("Security sentry watch") }
+
+        // Send text message
+        sendButton.setOnClickListener {
+            val text = chatInputField.text.toString().trim()
+            if (text.isNotEmpty()) {
+                chatInputField.setText("")
+                handleUserTextMessage(text)
+            }
+        }
+
+        chatInputField.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEND) {
+                val text = chatInputField.text.toString().trim()
+                if (text.isNotEmpty()) {
+                    chatInputField.setText("")
+                    handleUserTextMessage(text)
+                }
+                true
+            } else false
+        }
+
+        // Speaker TTS toggle
+        speakerToggleBtn.setOnClickListener {
+            isTtsMuted = !isTtsMuted
+            if (isTtsMuted) {
+                speakerToggleBtn.setImageResource(R.drawable.ic_volume_mute)
+                tts?.stop()
+                statusText.text = "Voice Output Muted 🔇"
+            } else {
+                speakerToggleBtn.setImageResource(R.drawable.ic_volume_up)
+                statusText.text = "Voice Output Active 🔊"
+            }
+        }
+
+        // Mic Button
         micButton.setOnClickListener {
-            toggleMute()
+            toggleListening()
         }
 
         micButton.setOnLongClickListener {
-            interruptMyra()
+            stopAllSpeechAndListening()
             true
+        }
+    }
+
+    private fun initTts() {
+        tts = TextToSpeech(this, this)
+    }
+
+    override fun onInit(status: Int) {
+        if (status == TextToSpeech.SUCCESS) {
+            isTtsReady = true
+            tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {
+                    runOnUiThread {
+                        orbView.setState(OrbAnimationView.OrbState.SPEAKING)
+                        waveformView.setAmplitude(0.7f)
+                        statusText.text = "Bol rahi hoon... 💖"
+                        animateRedOverlay(0.08f)
+                    }
+                }
+
+                override fun onDone(utteranceId: String?) {
+                    runOnUiThread {
+                        orbView.setState(OrbAnimationView.OrbState.IDLE)
+                        waveformView.setAmplitude(0f)
+                        statusText.text = "Tap mic ya bol kar batao 💬"
+                        animateRedOverlay(0f)
+                    }
+                }
+
+                override fun onError(utteranceId: String?) {
+                    runOnUiThread {
+                        orbView.setState(OrbAnimationView.OrbState.IDLE)
+                        waveformView.setAmplitude(0f)
+                        animateRedOverlay(0f)
+                    }
+                }
+            })
+        }
+    }
+
+    private fun speakOut(text: String) {
+        if (isTtsMuted || !isTtsReady || text.isBlank()) return
+
+        val cleanText = text.replace(Regex("[*_#`❤️💕😊✨💬🚀]"), "").trim()
+        val prefs = getSharedPreferences("myra_prefs", Context.MODE_PRIVATE)
+        val personality = prefs.getString("personality_mode", "GF") ?: "GF"
+
+        when (personality) {
+            "Professional" -> {
+                tts?.setPitch(0.95f)
+                tts?.setSpeechRate(1.0f)
+            }
+            "Assistant" -> {
+                tts?.setPitch(1.05f)
+                tts?.setSpeechRate(1.0f)
+            }
+            else -> {
+                // GF Mode
+                tts?.setPitch(1.2f)
+                tts?.setSpeechRate(1.02f)
+            }
+        }
+
+        // Multilingual dialect
+        val loc = if (cleanText.any { it in '\u0900'..'\u097F' } ||
+            personality == "GF" ||
+            cleanText.contains(Regex("(?i)\\b(haan|kholo|karo|rahi|raha|suno|kaho|namaste|theek|bhai|priya)\\b"))) {
+            Locale("hi", "IN")
+        } else {
+            Locale.US
+        }
+
+        tts?.language = loc
+        tts?.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, "myra_utterance_${System.currentTimeMillis()}")
+    }
+
+    private fun handleUserTextMessage(userText: String) {
+        chatAdapter.addMessage(ChatMessage(userText, isUser = true))
+        chatRecycler.scrollToPosition(chatAdapter.itemCount - 1)
+
+        orbView.setState(OrbAnimationView.OrbState.THINKING)
+        statusText.text = "Soch rahi hoon... 💭"
+
+        val prefs = getSharedPreferences("myra_prefs", Context.MODE_PRIVATE)
+        val apiKey = prefs.getString("api_key", "") ?: ""
+        val personality = prefs.getString("personality_mode", "GF") ?: "GF"
+        val userName = prefs.getString("user_name", "Boss") ?: "Boss"
+
+        val jsonStr = prefs.getString("prime_contacts_json", null)
+        var primeName = "Priya"
+        var primeNumber = "+919876543210"
+        if (!jsonStr.isNullOrEmpty()) {
+            try {
+                val array = JSONArray(jsonStr)
+                if (array.length() > 0) {
+                    val obj = array.getJSONObject(0)
+                    primeName = obj.optString("name", "Priya")
+                    primeNumber = obj.optString("number", "+919876543210")
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        lifecycleScope.launch {
+            val result = aiEngine.processUserMessage(userText, personality, userName, primeName, primeNumber, apiKey)
+            val replyText = result.first
+            val command = result.second
+
+            chatAdapter.addMessage(ChatMessage(replyText, isUser = false))
+            chatRecycler.scrollToPosition(chatAdapter.itemCount - 1)
+
+            // Speak response
+            speakOut(replyText)
+
+            // Execute action command if detected
+            if (command != null) {
+                viewModel.executeCommand(command)
+            }
+        }
+    }
+
+    private fun toggleListening() {
+        if (isListening) {
+            stopListening()
+        } else {
+            startListening()
+        }
+    }
+
+    private fun startListening() {
+        if (speechRecognizer == null) {
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
+        }
+
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        }
+
+        speechRecognizer?.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {
+                isListening = true
+                orbView.setState(OrbAnimationView.OrbState.LISTENING)
+                waveformView.setAmplitude(0.4f)
+                statusText.text = "Sun rahi hoon... Bolye 🎙️"
+                micButton.setImageResource(R.drawable.ic_mic_on)
+            }
+
+            override fun onBeginningOfSpeech() {
+                waveformView.setAmplitude(0.8f)
+            }
+
+            override fun onRmsChanged(rmsdB: Float) {
+                val normalized = (rmsdB / 10f).coerceIn(0.1f, 1f)
+                waveformView.setAmplitude(normalized)
+            }
+
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() {
+                waveformView.setAmplitude(0f)
+            }
+
+            override fun onError(error: Int) {
+                stopListening()
+            }
+
+            override fun onResults(results: Bundle?) {
+                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                val text = matches?.firstOrNull() ?: ""
+                stopListening()
+                if (text.isNotBlank()) {
+                    handleUserTextMessage(text)
+                }
+            }
+
+            override fun onPartialResults(partialResults: Bundle?) {}
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
+
+        speechRecognizer?.startListening(intent)
+    }
+
+    private fun stopListening() {
+        isListening = false
+        micButton.setImageResource(R.drawable.ic_mic_off)
+        waveformView.setAmplitude(0f)
+        try {
+            speechRecognizer?.stopListening()
+            speechRecognizer?.destroy()
+            speechRecognizer = null
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        orbView.setState(OrbAnimationView.OrbState.IDLE)
+        statusText.text = "Tap mic ya bol kar batao 💬"
+    }
+
+    private fun stopAllSpeechAndListening() {
+        stopListening()
+        tts?.stop()
+        audioEngine?.interruptAndClear()
+        geminiLive?.sendInterrupt()
+        orbView.setState(OrbAnimationView.OrbState.IDLE)
+        waveformView.setAmplitude(0f)
+        statusText.text = "Stopped. Sun rahi hoon..."
+        animateRedOverlay(0f)
+    }
+
+    private fun triggerIntruderAlert() {
+        animateRedOverlay(0.4f)
+        orbView.setState(OrbAnimationView.OrbState.SPEAKING)
+        statusText.text = "🚨 INTRUDER DETECTED! SENTRY ALARM TRIGGERED!"
+        speakOut("Alert! Unauthorized motion detected in the room! Warning!")
+        handler.postDelayed({
+            animateRedOverlay(0f)
+            orbView.setState(OrbAnimationView.OrbState.IDLE)
+        }, 5000)
+    }
+
+    private fun sendInitialGreeting() {
+        val prefs = getSharedPreferences("myra_prefs", Context.MODE_PRIVATE)
+        val personality = prefs.getString("personality_mode", "GF") ?: "GF"
+        val userName = prefs.getString("user_name", "Boss") ?: "Boss"
+
+        val greeting = when (personality) {
+            "Professional" -> "Good day $userName. MYRA is online and operational. How may I assist you?"
+            "Assistant" -> "Hello $userName! Main MYRA hoon. Kaise help karun aapki aaj? 😊"
+            else -> "Namaste $userName! MYRA AI Companion online hai 💖. Main aapki kya madad kar sakti hoon?"
+        }
+
+        chatAdapter.addMessage(ChatMessage(greeting, isUser = false))
+        speakOut(greeting)
+    }
+
+    private fun updatePersonalityBadge() {
+        val prefs = getSharedPreferences("myra_prefs", Context.MODE_PRIVATE)
+        val personality = prefs.getString("personality_mode", "GF") ?: "GF"
+        personalityBadgeText.text = when (personality) {
+            "Professional" -> "💼 PRO MODE"
+            "Assistant" -> "🤖 ASSISTANT"
+            else -> "💖 GF MODE"
         }
     }
 
@@ -153,71 +547,11 @@ class MainActivity : AppCompatActivity() {
             PermissionManager.markInitialCheckCompleted(this)
             return
         }
-
-        // Show educational explanation for microphone & voice interaction
-        if (!PermissionManager.isCategoryGranted(this, PermissionManager.PermissionCategory.MICROPHONE)) {
-            PermissionManager.showExplanationDialog(
-                this,
-                PermissionManager.PermissionCategory.MICROPHONE,
-                onProceed = {
-                    PermissionManager.requestPermissions(
-                        this,
-                        missing.toTypedArray(),
-                        PermissionManager.REQUEST_CODE_RUNTIME_PERMISSIONS
-                    )
-                },
-                onDismiss = {
-                    // Continue with degraded voice input; user can still type
-                    statusText.text = "Voice disabled. Tap mic to grant permission."
-                }
-            )
-        } else {
-            PermissionManager.requestPermissions(
-                this,
-                missing.toTypedArray(),
-                PermissionManager.REQUEST_CODE_RUNTIME_PERMISSIONS
-            )
-        }
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == PermissionManager.REQUEST_CODE_RUNTIME_PERMISSIONS) {
-            val denied = mutableListOf<String>()
-            for (i in permissions.indices) {
-                if (grantResults[i] != PackageManager.PERMISSION_GRANTED) {
-                    denied.add(permissions[i])
-                }
-            }
-
-            if (denied.isEmpty()) {
-                PermissionManager.markInitialCheckCompleted(this)
-                statusText.text = "All permissions granted. Sun rahi hoon..."
-                if (geminiLive == null) {
-                    initGeminiLive()
-                }
-            } else {
-                // Check if microphone was denied
-                if (denied.contains(Manifest.permission.RECORD_AUDIO)) {
-                    val permanentlyDenied = !ActivityCompat.shouldShowRequestPermissionRationale(
-                        this,
-                        Manifest.permission.RECORD_AUDIO
-                    )
-                    PermissionManager.handlePermissionDenial(
-                        this,
-                        PermissionManager.PermissionCategory.MICROPHONE,
-                        permanentlyDenied
-                    )
-                    statusText.text = "Microphone access denied. Tap mic to re-enable."
-                } else {
-                    statusText.text = "Some features limited. Sun rahi hoon..."
-                }
-            }
-        }
+        PermissionManager.requestPermissions(
+            this,
+            missing.toTypedArray(),
+            PermissionManager.REQUEST_CODE_RUNTIME_PERMISSIONS
+        )
     }
 
     private fun startSystemServices() {
@@ -253,7 +587,9 @@ class MainActivity : AppCompatActivity() {
             registerReceiver(null, filter)
         }
         val level: Int = batteryStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
-        batteryText.text = "BAT: $level%"
+        val status = batteryStatus?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+        batteryText.text = if (isCharging) "BAT: $level% ⚡" else "BAT: $level%"
 
         // RAM
         val actManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
@@ -263,32 +599,26 @@ class MainActivity : AppCompatActivity() {
         ramText.text = String.format(Locale.US, "RAM: %.1fGB", freeGb)
     }
 
-    private fun initGeminiLive() {
+    private fun initGeminiLiveIfConfigured() {
         val prefs = getSharedPreferences("myra_prefs", Context.MODE_PRIVATE)
         val apiKey = prefs.getString("api_key", "") ?: ""
+        if (apiKey.isBlank()) return
+
         val model = prefs.getString("gemini_model", GeminiLiveClient.DEFAULT_MODEL) ?: GeminiLiveClient.DEFAULT_MODEL
         val voice = prefs.getString("gemini_voice", GeminiLiveClient.DEFAULT_VOICE) ?: GeminiLiveClient.DEFAULT_VOICE
-        val personality = prefs.getString("personality_mode", "GF") ?: "GF"
-        val userName = prefs.getString("user_name", "Boss") ?: "Boss"
-
-        val systemPrompt = buildSystemPrompt(userName, personality)
 
         geminiLive = GeminiLiveClient(this).apply {
             currentApiKey = apiKey
             currentModel = model
             currentVoice = voice
-            currentSystemPrompt = systemPrompt
         }
 
         audioEngine = AudioEngine(this)
-
-        // Audio callbacks
         audioEngine?.onAudioChunkRecorded = { chunk ->
             if (!isInCallMode) {
                 geminiLive?.sendAudioChunk(chunk)
             }
         }
-
         audioEngine?.onAmplitudeChanged = { rms ->
             runOnUiThread {
                 waveformView.setAmplitude(rms)
@@ -296,222 +626,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        audioEngine?.onSpeakingStarted = {
-            runOnUiThread {
-                orbView.setState(OrbAnimationView.OrbState.SPEAKING)
-                statusText.text = "Bol rahi hoon... 💖"
-                animateRedOverlay(0.08f)
-            }
-        }
-
-        audioEngine?.onSpeakingStopped = {
-            runOnUiThread {
-                orbView.setState(OrbAnimationView.OrbState.LISTENING)
-                statusText.text = "Sun rahi hoon..."
-                animateRedOverlay(0f)
-            }
-        }
-
-        // WebSocket callbacks
-        geminiLive?.onConnected = {
-            runOnUiThread {
-                statusText.text = "MYRA Online 🌟"
-                micButton.setImageResource(R.drawable.ic_mic_on)
-                audioEngine?.startRecording()
-                audioEngine?.startPlayback()
-
-                handler.postDelayed({
-                    sendGreeting(userName, personality)
-                }, 600)
-            }
-        }
-
-        geminiLive?.onDisconnected = {
-            runOnUiThread {
-                statusText.text = "Connecting..."
-                micButton.setImageResource(R.drawable.ic_mic_off)
-                orbView.setState(OrbAnimationView.OrbState.IDLE)
-            }
-        }
-
-        geminiLive?.onError = { err ->
-            runOnUiThread {
-                statusText.text = err
-            }
-        }
-
         geminiLive?.onAudioReceived = { pcmBytes ->
             audioEngine?.queueAudio(pcmBytes)
         }
-
-        geminiLive?.onInputTranscript = { text ->
-            inputBuffer.append(text)
-        }
-
-        geminiLive?.onOutputTranscript = { text ->
-            outputBuffer.append(text)
-        }
-
-        geminiLive?.onToolCallReceived = { callId, name, args ->
-            runOnUiThread {
-                when (name) {
-                    "openWhatsApp" -> {
-                        viewModel.executeCommand(com.myra.assistant.model.AppCommand(
-                            com.myra.assistant.model.AppCommand.TYPE_OPEN_APP,
-                            mapOf("app_name" to "whatsapp")
-                        ))
-                    }
-                    "openApp" -> {
-                        val appName = args.optString("appName", "YouTube")
-                        viewModel.executeCommand(com.myra.assistant.model.AppCommand(
-                            com.myra.assistant.model.AppCommand.TYPE_OPEN_APP,
-                            mapOf("app_name" to appName)
-                        ))
-                    }
-                    "openUrl" -> {
-                        val url = args.optString("url", "")
-                        viewModel.executeCommand(com.myra.assistant.model.AppCommand(
-                            com.myra.assistant.model.AppCommand.TYPE_OPEN_BROWSER,
-                            mapOf("url" to url)
-                        ))
-                    }
-                    "makeCall" -> {
-                        val phone = args.optString("phoneNumber", "")
-                        viewModel.executeCommand(com.myra.assistant.model.AppCommand(
-                            com.myra.assistant.model.AppCommand.TYPE_CALL_PHONE,
-                            mapOf("phone_number" to phone)
-                        ))
-                    }
-                    "callContact" -> {
-                        val contact = args.optString("contactName", "")
-                        viewModel.executeCommand(com.myra.assistant.model.AppCommand(
-                            com.myra.assistant.model.AppCommand.TYPE_CALL_PHONE,
-                            mapOf("contact_name" to contact)
-                        ))
-                    }
-                }
-            }
-        }
-
-        geminiLive?.onTurnComplete = {
-            runOnUiThread {
-                val userText = inputBuffer.toString().trim()
-                val myraText = outputBuffer.toString().trim()
-
-                if (userText.isNotEmpty()) {
-                    chatAdapter.addMessage(ChatMessage(userText, isUser = true))
-                    chatRecycler.scrollToPosition(chatAdapter.itemCount - 1)
-
-                    // Parse voice command
-                    val command = CommandParser.parse(userText)
-                    if (command != null) {
-                        viewModel.executeCommand(command)
-                    }
-                }
-
-                if (myraText.isNotEmpty()) {
-                    chatAdapter.addMessage(ChatMessage(myraText, isUser = false))
-                    chatRecycler.scrollToPosition(chatAdapter.itemCount - 1)
-                }
-
-                inputBuffer.clear()
-                outputBuffer.clear()
-            }
-        }
-
         geminiLive?.connect()
-    }
-
-    private fun buildSystemPrompt(userName: String, personality: String): String {
-        val now = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date())
-        val personalityBlock = when (personality) {
-            "Professional" -> """
-                - Formal English only.
-                - Precise, efficient, no emojis.
-                - Max 2 sentences per response.
-            """.trimIndent()
-            "Assistant" -> """
-                - Friendly Hinglish or English helper.
-                - Helpful and balanced.
-                - Max 2-3 sentences.
-            """.trimIndent()
-            else -> """
-                - Name: MYRA (AI Companion)
-                - Language: Hinglish (natural Hindi + English mix)
-                - Tone: Warm, caring, emotionally expressive
-                - Use natural words: "tumhara", "haan", "acha", "bilkul"
-                - Expressions: "main yahan hoon ❤️", "tumne yaad kiya? 😊"
-                - Max 2-3 sentences per response.
-            """.trimIndent()
-        }
-
-        return """
-            You are MYRA, a production-ready AI voice companion speaking aloud to $userName.
-            Current Date/Time: $now.
-            $personalityBlock
-            You are speaking ALOUD — keep all responses natural, punchy, and conversational (max 2-3 sentences).
-
-            MULTILINGUAL VOICE SUPPORT:
-            - Automatically detect the language spoken by the user and respond in the exact same language (Hindi, English, Hinglish, Marathi, Gujarati, Bengali, Tamil, Telugu, Kannada, Malayalam, Punjabi, Urdu, etc.).
-            - If user speaks Hindi, respond in Hindi ("Hindi mein baat karo" -> switch immediately to Hindi).
-            - If user speaks English, respond in English ("Talk to me in English" -> switch to English).
-            - If user speaks Hinglish, respond in natural Hinglish.
-            - Automatically switch languages mid-conversation if the user switches. No manual selection required.
-
-            FUNCTION CALLING / REAL APP EXECUTION:
-            You have access to tools: openWhatsApp, openApp, openUrl, makeCall, callContact.
-            - "Open WhatsApp" / "WhatsApp kholo" -> invoke openWhatsApp.
-            - "Open YouTube", "Open Instagram", "Open Chrome", "Open Settings" -> invoke openApp(appName).
-            - "Mummy ko call karo", "Call Mom", "Call Rahul" -> invoke callContact(contactName).
-            - "Call 9876543210" -> invoke makeCall(phoneNumber).
-            Never pretend an action opened without executing the tool!
-
-            MYRA TOOLS & CAPABILITIES AWARENESS (2026 EDITION):
-            1. Communication: WhatsApp messaging, direct SMS, Email inbox/compose, Emergency SOS alert.
-            2. Calls: Call contact, number lookup, answer ringing call, end/reject call.
-            3. Media: Play music/songs (auto-play YouTube Music/Spotify), media control (pause/next/resume), volume set %.
-            4. Device: Alarms, timers, flashlight on/off, battery status, instant screen lock, clipboard, storage cleanup.
-            5. Maps & Navigation: Turn-by-turn navigation (Google Maps), location coordinates, parking location memory ("yahan park kiya hai yaad rakho"), nearby ATM/hospitals/fuel.
-            6. Notifications: Read recent notifications, read missed calls, explicit OTP reading.
-            7. System & Screen Automation: Phone health diagnosis, background task execution and killing ("ruk jao").
-
-            SAFETY RULES:
-            - OTP Privacy: Never speak OTPs, passwords, or PINs proactively; only when the user explicitly asks ("OTP batao").
-            - Instant Lock: "Lock kar do" or "phone band kar do" executes instantly with no confirmation required.
-            - Call-Reject Guard: A ringing call is only rejected if the user clearly said reject within recent seconds.
-            - Honesty in Data: If real-time traffic or offline map tiles are unavailable, be honest and state it.
-        """.trimIndent()
-    }
-
-    private fun sendGreeting(userName: String, personality: String) {
-        val greeting = when (personality) {
-            "Professional" -> "Good day $userName. MYRA is online and ready to assist you."
-            "Assistant" -> "Hello $userName! Main MYRA hoon. Kaise help karun aapki?"
-            else -> "Hey $userName! Main aa gayi hoon. Kya help chahiye tumhe? ❤️"
-        }
-        geminiLive?.sendText(greeting)
-    }
-
-    private fun toggleMute() {
-        val engine = audioEngine ?: return
-        engine.isMuted = !engine.isMuted
-        if (engine.isMuted) {
-            micButton.setImageResource(R.drawable.ic_mic_off)
-            statusText.text = "Mic Muted 🔇"
-            orbView.setState(OrbAnimationView.OrbState.IDLE)
-        } else {
-            micButton.setImageResource(R.drawable.ic_mic_on)
-            statusText.text = "Sun rahi hoon..."
-            orbView.setState(OrbAnimationView.OrbState.LISTENING)
-        }
-    }
-
-    private fun interruptMyra() {
-        audioEngine?.interruptAndClear()
-        geminiLive?.sendInterrupt()
-        orbView.setState(OrbAnimationView.OrbState.LISTENING)
-        statusText.text = "Interrupted. Sun rahi hoon..."
-        animateRedOverlay(0f)
     }
 
     private fun animateRedOverlay(targetAlpha: Float) {
@@ -533,86 +651,30 @@ class MainActivity : AppCompatActivity() {
 
     private fun announceCall(callerName: String) {
         isInCallMode = true
-        audioEngine?.isMuted = true
         orbView.setState(OrbAnimationView.OrbState.SPEAKING)
-
         val announcement = "Sir, $callerName ka call aa raha hai. Uthau ya reject karu?"
-        geminiLive?.sendText(announcement)
-
-        // After announcement -> start STT to listen for user decision
-        handler.postDelayed({
-            listenForCallDecision()
-        }, 4500)
-    }
-
-    private fun listenForCallDecision() {
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
-        val sttIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-        }
-
-        speechRecognizer?.setRecognitionListener(object : RecognitionListener {
-            override fun onResults(results: Bundle?) {
-                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                val text = matches?.firstOrNull()?.lowercase() ?: ""
-
-                if (text.contains("uthao") || text.contains("haan") || text.contains("accept") || text.contains("pick")) {
-                    viewModel.acceptCall()
-                    geminiLive?.sendText("Call utha li hai.")
-                } else if (text.contains("reject") || text.contains("nahi") || text.contains("mat") || text.contains("cut")) {
-                    viewModel.rejectCall()
-                    geminiLive?.sendText("Call reject kar di hai.")
-                }
-
-                isInCallMode = false
-                audioEngine?.isMuted = false
-                speechRecognizer?.destroy()
-            }
-
-            override fun onError(error: Int) {
-                isInCallMode = false
-                audioEngine?.isMuted = false
-                speechRecognizer?.destroy()
-            }
-
-            override fun onReadyForSpeech(params: Bundle?) {}
-            override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) {}
-            override fun onBufferReceived(buffer: ByteArray?) {}
-            override fun onEndOfSpeech() {}
-            override fun onPartialResults(partialResults: Bundle?) {}
-            override fun onEvent(eventType: Int, params: Bundle?) {}
-        })
-
-        speechRecognizer?.startListening(sttIntent)
+        speakOut(announcement)
     }
 
     private fun observeViewModel() {
         viewModel.commandResult.observe(this) { result ->
             if (!result.isNullOrBlank()) {
-                chatAdapter.addMessage(ChatMessage("MYRA: $result", isUser = false))
+                chatAdapter.addMessage(ChatMessage(result, isUser = false))
                 chatRecycler.scrollToPosition(chatAdapter.itemCount - 1)
-                geminiLive?.sendText(result)
+                speakOut(result)
             }
         }
     }
 
     override fun onResume() {
         super.onResume()
-        if (audioEngine != null && !audioEngine!!.isMuted) {
-            audioEngine?.startRecording()
-        }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        audioEngine?.stopRecording()
+        updatePersonalityBadge()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        tts?.stop()
+        tts?.shutdown()
         geminiLive?.disconnect()
         audioEngine?.release()
         try {
@@ -620,64 +682,5 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             e.printStackTrace()
         }
-    }
-}
-
-/**
- * JavaScript-to-Native Android Bridge for MYRA Assistant
- * Bound to WebViews to execute device actions:
- * - openApp(appName)
- * - makeCall(phoneNumber)
- * - callContact(contactName)
- * - openWhatsApp()
- * - openUrl(url)
- */
-class MyraAndroidBridge(
-    private val context: Context,
-    private val viewModel: MainViewModel
-) {
-    @android.webkit.JavascriptInterface
-    fun openApp(appName: String): Boolean {
-        viewModel.executeCommand(com.myra.assistant.model.AppCommand(
-            com.myra.assistant.model.AppCommand.TYPE_OPEN_APP,
-            mapOf("app_name" to appName)
-        ))
-        return true
-    }
-
-    @android.webkit.JavascriptInterface
-    fun makeCall(phoneNumber: String): Boolean {
-        viewModel.executeCommand(com.myra.assistant.model.AppCommand(
-            com.myra.assistant.model.AppCommand.TYPE_CALL_PHONE,
-            mapOf("phone_number" to phoneNumber)
-        ))
-        return true
-    }
-
-    @android.webkit.JavascriptInterface
-    fun callContact(contactName: String): Boolean {
-        viewModel.executeCommand(com.myra.assistant.model.AppCommand(
-            com.myra.assistant.model.AppCommand.TYPE_CALL_PHONE,
-            mapOf("contact_name" to contactName)
-        ))
-        return true
-    }
-
-    @android.webkit.JavascriptInterface
-    fun openWhatsApp(): Boolean {
-        viewModel.executeCommand(com.myra.assistant.model.AppCommand(
-            com.myra.assistant.model.AppCommand.TYPE_OPEN_APP,
-            mapOf("app_name" to "whatsapp")
-        ))
-        return true
-    }
-
-    @android.webkit.JavascriptInterface
-    fun openUrl(url: String): Boolean {
-        viewModel.executeCommand(com.myra.assistant.model.AppCommand(
-            com.myra.assistant.model.AppCommand.TYPE_OPEN_BROWSER,
-            mapOf("url" to url)
-        ))
-        return true
     }
 }

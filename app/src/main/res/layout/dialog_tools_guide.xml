@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_dialog_card"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_guide" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-black"
+                android:letterSpacing="0.05"
+                android:text="MYRA VOICE COMMANDS GUIDE"
+                android:textColor="@color/white"
+                android:textSize="15sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="2026 Tools &amp; Intelligence Reference"
+                android:textColor="@color/text_secondary"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/dialogCloseBtn"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Close"
+            android:src="@drawable/ic_close" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginVertical="12dp"
+        android:background="#22FFFFFF" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="380dp"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Category 1 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="1. 📞 CALLS &amp; CONTACTS"
+                android:textColor="@color/primary_red"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_input_field"
+                android:fontFamily="sans-serif"
+                android:lineSpacingExtra="4dp"
+                android:padding="10dp"
+                android:text="• 'Mummy ko call karo' — Dials contact\n• 'Call 9876543210' — Dials specific number\n• 'Rahul ka number batao' — Speaks number without calling\n• 'Close friend ko call karo' — Speed dial Prime Contact"
+                android:textColor="@color/white"
+                android:textSize="11sp" />
+
+            <!-- Category 2 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:fontFamily="monospace"
+                android:text="2. 💬 WHATSAPP &amp; SMS"
+                android:textColor="@color/primary_red"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_input_field"
+                android:fontFamily="sans-serif"
+                android:lineSpacingExtra="4dp"
+                android:padding="10dp"
+                android:text="• 'WhatsApp kholo' — Launches WhatsApp app\n• 'Rahul ko WhatsApp pe bolo main late hoon' — Direct message\n• 'SMS bhejo Priya ko' — Opens SMS composer"
+                android:textColor="@color/white"
+                android:textSize="11sp" />
+
+            <!-- Category 3 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:fontFamily="monospace"
+                android:text="3. ⚡ HARDWARE &amp; DEVICE TOOLS"
+                android:textColor="@color/primary_red"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_input_field"
+                android:fontFamily="sans-serif"
+                android:lineSpacingExtra="4dp"
+                android:padding="10dp"
+                android:text="• 'Torch on karo' / 'Torch off karo' — Real camera LED\n• 'Battery kitni hai' — Reads battery level &amp; charging\n• 'Lock kar do' — Instant screen lock (No confirmation needed)\n• 'Volume 80% karo' / 'Volume badhao'\n• 'Storage clean kar do' — Purges temp cache files"
+                android:textColor="@color/white"
+                android:textSize="11sp" />
+
+            <!-- Category 4 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:fontFamily="monospace"
+                android:text="4. 🗺️ MAPS, NAVIGATION &amp; PARKING"
+                android:textColor="@color/primary_red"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_input_field"
+                android:fontFamily="sans-serif"
+                android:lineSpacingExtra="4dp"
+                android:padding="10dp"
+                android:text="• 'Airport ka rasta dikhao' — Turn-by-turn navigation\n• 'Main kahan hoon' — Current GPS coordinates\n• 'Yahan park kiya hai yaad rakho' — Saves parking location\n• 'Gaadi kahan park ki thi' — Recalls saved parking spot"
+                android:textColor="@color/white"
+                android:textSize="11sp" />
+
+            <!-- Category 5 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:fontFamily="monospace"
+                android:text="5. 🎵 MUSIC &amp; MEDIA"
+                android:textColor="@color/primary_red"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_input_field"
+                android:fontFamily="sans-serif"
+                android:lineSpacingExtra="4dp"
+                android:padding="10dp"
+                android:text="• 'Arijit Singh ka gaana chalao' — YouTube Music / Spotify\n• 'Pause karo' / 'Play karo' / 'Next song' — Media key dispatch"
+                android:textColor="@color/white"
+                android:textSize="11sp" />
+
+            <!-- Category 6 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:fontFamily="monospace"
+                android:text="6. 🚨 SAFETY &amp; PRIVACY RULES"
+                android:textColor="@color/primary_red"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_prime_card"
+                android:fontFamily="sans-serif"
+                android:lineSpacingExtra="4dp"
+                android:padding="10dp"
+                android:text="• SOS Emergency: Instant SMS + GPS to Prime Contact\n• OTP Protection: Never spoken proactively, only on explicit user request ('OTP batao')\n• Automation Gate: Instagram/Facebook posts strictly require user confirmation before publishing"
+                android:textColor="@color/white"
+                android:textSize="11sp" />
+
+        </LinearLayout>
+    </ScrollView>
+
+</LinearLayout>
