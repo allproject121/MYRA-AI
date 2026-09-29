@@ -32,6 +32,7 @@ import com.myra.assistant.ai.CommandParser
 import com.myra.assistant.ai.GeminiLiveClient
 import com.myra.assistant.service.CallMonitorService
 import com.myra.assistant.service.MyraOverlayService
+import com.myra.assistant.service.PermissionManager
 import com.myra.assistant.ui.settings.SettingsActivity
 import com.myra.assistant.viewmodel.MainViewModel
 import java.text.SimpleDateFormat
@@ -147,11 +148,75 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkPermissions() {
-        val missing = requiredPermissions.filter {
-            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        val missing = PermissionManager.getCriticalMissingPermissions(this)
+        if (missing.isEmpty()) {
+            PermissionManager.markInitialCheckCompleted(this)
+            return
         }
-        if (missing.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this, missing.toTypedArray(), 1001)
+
+        // Show educational explanation for microphone & voice interaction
+        if (!PermissionManager.isCategoryGranted(this, PermissionManager.PermissionCategory.MICROPHONE)) {
+            PermissionManager.showExplanationDialog(
+                this,
+                PermissionManager.PermissionCategory.MICROPHONE,
+                onProceed = {
+                    PermissionManager.requestPermissions(
+                        this,
+                        missing.toTypedArray(),
+                        PermissionManager.REQUEST_CODE_RUNTIME_PERMISSIONS
+                    )
+                },
+                onDismiss = {
+                    // Continue with degraded voice input; user can still type
+                    statusText.text = "Voice disabled. Tap mic to grant permission."
+                }
+            )
+        } else {
+            PermissionManager.requestPermissions(
+                this,
+                missing.toTypedArray(),
+                PermissionManager.REQUEST_CODE_RUNTIME_PERMISSIONS
+            )
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == PermissionManager.REQUEST_CODE_RUNTIME_PERMISSIONS) {
+            val denied = mutableListOf<String>()
+            for (i in permissions.indices) {
+                if (grantResults[i] != PackageManager.PERMISSION_GRANTED) {
+                    denied.add(permissions[i])
+                }
+            }
+
+            if (denied.isEmpty()) {
+                PermissionManager.markInitialCheckCompleted(this)
+                statusText.text = "All permissions granted. Sun rahi hoon..."
+                if (geminiLive == null) {
+                    initGeminiLive()
+                }
+            } else {
+                // Check if microphone was denied
+                if (denied.contains(Manifest.permission.RECORD_AUDIO)) {
+                    val permanentlyDenied = !ActivityCompat.shouldShowRequestPermissionRationale(
+                        this,
+                        Manifest.permission.RECORD_AUDIO
+                    )
+                    PermissionManager.handlePermissionDenial(
+                        this,
+                        PermissionManager.PermissionCategory.MICROPHONE,
+                        permanentlyDenied
+                    )
+                    statusText.text = "Microphone access denied. Tap mic to re-enable."
+                } else {
+                    statusText.text = "Some features limited. Sun rahi hoon..."
+                }
+            }
         }
     }
 
