@@ -197,7 +197,57 @@ object CommandParser {
             return AppCommand(AppCommand.TYPE_OPEN_BROWSER)
         }
 
-        // 14. Phone Calls
+        // WhatsApp Command Variations
+        if (clean.contains("whatsapp kholo") || clean.contains("open whatsapp") || clean.contains("whatsapp open karo") || clean.contains("whatsapp chalao") || clean.contains("open my whatsapp") || clean.contains("can you open whatsapp") || clean == "whatsapp") {
+            return AppCommand(AppCommand.TYPE_OPEN_APP, mapOf("app_name" to "whatsapp"))
+        }
+
+        // Direct phone number dialing
+        val directPhoneMatch = Regex("(?:call|dial|phone lagao|phone karo)\\s+([+]?[0-9]{7,14})").find(clean)
+        if (directPhoneMatch != null) {
+            val num = directPhoneMatch.groupValues[1]
+            return AppCommand(AppCommand.TYPE_CALL_PHONE, mapOf("phone_number" to num))
+        }
+
+        // 14. Visual Social Media Agent (Closed-Loop Automation)
+        if (clean.contains("instagram") || clean.contains("insta")) {
+            val isStory = clean.contains("story")
+            val isReel = clean.contains("reel")
+            val action = if (isStory) "POST_STORY" else if (isReel) "POST_REEL" else "POST_FEED"
+            val caption = clean.substringAfter("caption", "").trim()
+            return AppCommand(
+                AppCommand.TYPE_SOCIAL_MEDIA_TASK,
+                mapOf(
+                    "platform" to "INSTAGRAM",
+                    "action" to action,
+                    "caption" to caption
+                )
+            )
+        }
+
+        if (clean.contains("facebook") || clean.contains("fb")) {
+            val isMedia = clean.contains("photo") || clean.contains("video") || clean.contains("image")
+            val action = if (isMedia) "POST_FEED" else "POST_TEXT"
+            val caption = clean.substringAfter("post", "").replace("karo", "").trim()
+            return AppCommand(
+                AppCommand.TYPE_SOCIAL_MEDIA_TASK,
+                mapOf(
+                    "platform" to "FACEBOOK",
+                    "action" to action,
+                    "caption" to caption
+                )
+            )
+        }
+
+        if (clean == "confirm post" || clean == "yes share it" || clean == "haan post kar do" || clean == "share it" || clean == "post kar do") {
+            return AppCommand(AppCommand.TYPE_SOCIAL_MEDIA_CONTROL, mapOf("command" to "confirm"))
+        }
+
+        if (clean == "reject post" || clean == "cancel post" || clean == "mat post karo" || clean == "discard post") {
+            return AppCommand(AppCommand.TYPE_SOCIAL_MEDIA_CONTROL, mapOf("command" to "reject"))
+        }
+
+        // 15. Phone Calls
         if (clean.contains("call karo") || clean.contains("call lagao") || clean.contains("phone karo") || clean.startsWith("call ")) {
             val name = extractTargetName(clean, listOf("call karo", "call lagao", "phone karo", "call", "ko", "to"))
             if (name.isNotEmpty()) {

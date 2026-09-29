@@ -13,6 +13,10 @@ import { WaveformView } from './components/WaveformView';
 import { ChatRecycler } from './components/ChatRecycler';
 import { SettingsModal } from './components/SettingsModal';
 import { ToolsActionCenterModal } from './components/ToolsActionCenterModal';
+import { ToolsGuideModal } from './components/ToolsGuideModal';
+import { SecurityModeModal } from './components/SecurityModeModal';
+import { PhoneUtilitiesModal } from './components/PhoneUtilitiesModal';
+import { SocialMediaAgentModal } from './components/SocialMediaAgentModal';
 import { CallAssistantModal } from './components/CallAssistantModal';
 import { SecurityLockModal } from './components/SecurityLockModal';
 import { FloatingOrbOverlay } from './components/FloatingOrbOverlay';
@@ -23,12 +27,18 @@ import {
   MicOff,
   Send,
   Wrench,
+  BookOpen,
   PhoneCall,
   Flame,
+  Shield,
   ShieldAlert,
+  Sliders,
   Layers,
   Sparkles,
+  Share2,
 } from 'lucide-react';
+
+import { ActionBridge } from './utils/actionBridge';
 
 export default function App() {
   // State
@@ -81,6 +91,11 @@ export default function App() {
   // Modals
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showToolsCenter, setShowToolsCenter] = useState<boolean>(false);
+  const [showGuideModal, setShowGuideModal] = useState<boolean>(false);
+  const [showSecurityModal, setShowSecurityModal] = useState<boolean>(false);
+  const [showUtilitiesModal, setShowUtilitiesModal] = useState<boolean>(false);
+  const [showSocialModal, setShowSocialModal] = useState<boolean>(false);
+  const [utilitiesTab, setUtilitiesTab] = useState<'password' | 'qrcode' | 'speedtest' | 'notes' | 'system'>('password');
   const [showPinModal, setShowPinModal] = useState<boolean>(false);
   const [pendingActionAfterPin, setPendingActionAfterPin] = useState<(() => void) | null>(null);
 
@@ -185,7 +200,7 @@ export default function App() {
     return () => clearInterval(timer);
   }, [assistantState]);
 
-  // Speak aloud via SpeechSynthesis
+  // Speak aloud via SpeechSynthesis with Multi-Language auto-detection
   const speakText = (text: string) => {
     if (!naturalVoice || typeof window === 'undefined' || !window.speechSynthesis) return;
 
@@ -193,18 +208,44 @@ export default function App() {
     const cleanText = text.replace(/[*_#`]/g, '');
     const utterance = new SpeechSynthesisUtterance(cleanText);
 
+    // Multi-Language automatic script/dialect detection
+    let detectedLang = 'en-US';
+    if (/[\u0900-\u097F]/.test(cleanText)) {
+      detectedLang = 'hi-IN'; // Hindi / Marathi
+    } else if (/[\u0A80-\u0AFF]/.test(cleanText)) {
+      detectedLang = 'gu-IN'; // Gujarati
+    } else if (/[\u0980-\u09FF]/.test(cleanText)) {
+      detectedLang = 'bn-IN'; // Bengali
+    } else if (/[\u0B80-\u0BFF]/.test(cleanText)) {
+      detectedLang = 'ta-IN'; // Tamil
+    } else if (/[\u0C00-\u0C7F]/.test(cleanText)) {
+      detectedLang = 'te-IN'; // Telugu
+    } else if (/[\u0C80-\u0CFF]/.test(cleanText)) {
+      detectedLang = 'kn-IN'; // Kannada
+    } else if (/[\u0D00-\u0D7F]/.test(cleanText)) {
+      detectedLang = 'ml-IN'; // Malayalam
+    } else if (/[\u0A00-\u0A7F]/.test(cleanText)) {
+      detectedLang = 'pa-IN'; // Punjabi
+    } else if (/[\u0600-\u06FF]/.test(cleanText)) {
+      detectedLang = 'ur-IN'; // Urdu
+    } else if (
+      personality === 'gf' ||
+      /\b(haan|kholo|karo|rahi|raha|hain|baby|jaan|suno|kaho|namaste|theek|bhai|priya|rahul|khana|kya|kyun|aap|tum)\b/i.test(cleanText)
+    ) {
+      detectedLang = 'hi-IN'; // Natural Hinglish
+    }
+
+    utterance.lang = detectedLang;
+
     if (personality === 'gf') {
       utterance.pitch = 1.2;
       utterance.rate = 1.05;
-      utterance.lang = 'hi-IN';
     } else if (personality === 'pro') {
       utterance.pitch = 0.95;
       utterance.rate = 1.0;
-      utterance.lang = 'en-US';
     } else {
       utterance.pitch = 1.05;
       utterance.rate = 1.0;
-      utterance.lang = 'en-US';
     }
 
     utterance.onstart = () => {
@@ -254,42 +295,138 @@ export default function App() {
     }
   };
 
-  // Real Device & Web Action Dispatcher
+  // Real Device & Web Action Dispatcher via ActionBridge
   const executeDeviceAction = (action: { type: string; target?: string; value?: string | number }) => {
     switch (action.type) {
-      case 'TOGGLE_TORCH':
-        toggleHardwareTorch(action.value === 'ON');
+      case 'OPEN_WHATSAPP':
+        ActionBridge.openWhatsApp(action.target, action.value as string);
         break;
 
       case 'OPEN_APP':
         if (action.target) {
-          const target = action.target.toLowerCase();
-          if (target.includes('youtube')) {
-            window.open('https://www.youtube.com', '_blank');
-          } else if (target.includes('whatsapp')) {
-            window.open('https://web.whatsapp.com', '_blank');
-          } else if (target.includes('spotify') || target.includes('music')) {
-            window.open('https://open.spotify.com', '_blank');
-          } else if (target.includes('gmail') || target.includes('mail')) {
-            window.open('https://mail.google.com', '_blank');
-          } else if (target.includes('maps') || target.includes('map')) {
-            window.open('https://maps.google.com', '_blank');
-          } else if (target.includes('chrome') || target.includes('browser')) {
-            window.open('https://www.google.com', '_blank');
-          } else {
-            window.open(`https://www.google.com/search?q=${encodeURIComponent(action.target)}`, '_blank');
-          }
+          ActionBridge.openApp(action.target);
         }
         break;
 
-      case 'CALL_CONTACT': {
-        const targetNumber = (action.value as string) || primeContact.phone;
-        window.location.href = `tel:${targetNumber}`;
+      case 'OPEN_URL':
+        if (action.target) {
+          ActionBridge.openUrl(action.target);
+        }
+        break;
+
+      case 'MAKE_CALL': {
+        const phone = (action.value || action.target || '') as string;
+        if (phone) {
+          ActionBridge.makeCall(phone);
+        }
         break;
       }
 
+      case 'CALL_CONTACT': {
+        const name = (action.target || primeContact.name) as string;
+        const result = ActionBridge.callContact(name, primeContact);
+        if (result.status === 'clarification_needed' && result.message) {
+          const clarifyMsg: ChatMessage = {
+            id: Date.now().toString(),
+            sender: 'myra',
+            text: result.message,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          };
+          setMessages((prev) => [...prev, clarifyMsg]);
+          speakText(result.message);
+        }
+        break;
+      }
+
+      case 'TOGGLE_TORCH':
+        toggleHardwareTorch(action.value === 'ON');
+        break;
+
       case 'LOCK_DEVICE':
         setDeviceState((s) => ({ ...s, screenLocked: true }));
+        break;
+
+      case 'SECURITY_MODE_ON':
+        setShowSecurityModal(true);
+        break;
+
+      case 'SECURITY_MODE_OFF':
+        setShowSecurityModal(false);
+        break;
+
+      case 'SOCIAL_MEDIA_TASK':
+      case 'SOCIAL_MEDIA_CONTROL':
+        setShowSocialModal(true);
+        break;
+
+      case 'OPEN_UTILITY':
+        if (action.target) {
+          setUtilitiesTab(action.target as any);
+        }
+        setShowUtilitiesModal(true);
+        break;
+
+      case 'PLAY_YOUTUBE':
+        window.open(
+          `https://www.youtube.com/results?search_query=${encodeURIComponent(action.target || 'music')}`,
+          '_blank'
+        );
+        break;
+
+      case 'SET_VOLUME':
+        if (typeof action.value === 'string' && action.value.startsWith('+')) {
+          setDeviceState((s) => ({ ...s, volume: Math.min(100, s.volume + 15) }));
+        } else if (typeof action.value === 'string' && action.value.startsWith('-')) {
+          setDeviceState((s) => ({ ...s, volume: Math.max(0, s.volume - 15) }));
+        }
+        break;
+
+      case 'MEDIA_CONTROL':
+        // Audio/media state feedback
+        break;
+
+      case 'SET_THEME':
+        // Theme switcher
+        if (action.value === 'light') {
+          document.documentElement.classList.remove('dark');
+        } else {
+          document.documentElement.classList.add('dark');
+        }
+        break;
+
+      case 'TAKE_SCREENSHOT':
+      case 'OPEN_CAMERA':
+        setShowSecurityModal(true);
+        break;
+
+      case 'SET_TIMER':
+      case 'VOICE_RECORD':
+      case 'SCREEN_RECORD':
+        setUtilitiesTab('system');
+        setShowUtilitiesModal(true);
+        break;
+
+      case 'CLIPBOARD_WRITE':
+        if (typeof action.value === 'string' && navigator.clipboard) {
+          navigator.clipboard.writeText(action.value).catch(() => {});
+        }
+        break;
+
+      case 'SEND_NOTIFICATION':
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+          new Notification('MYRA Alert', { body: (action.value as string) || 'Notification from MYRA' });
+        } else if (typeof Notification !== 'undefined' && Notification.permission !== 'denied') {
+          Notification.requestPermission().then((perm) => {
+            if (perm === 'granted') {
+              new Notification('MYRA Alert', { body: (action.value as string) || 'Notification from MYRA' });
+            }
+          });
+        }
+        break;
+
+      case 'RESTART_DEVICE':
+      case 'CANCEL_SHUTDOWN':
+        // Visual indicator
         break;
 
       default:
@@ -516,6 +653,14 @@ export default function App() {
             {currentTime}
           </span>
           <button
+            onClick={() => setShowGuideModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#18080c] border border-[#FF1744]/40 hover:bg-[#FF1744]/20 text-[#FF6D6D] hover:text-white transition-all text-xs font-mono font-bold shadow-sm"
+            title="MYRA Complete Tools & Features Guide (2026 Edition)"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-[#FF1744]" />
+            <span>GUIDE 2026</span>
+          </button>
+          <button
             onClick={() => setShowToolsCenter(true)}
             className="p-2 rounded-xl bg-[#111124] border border-[#22223e] hover:border-[#00E5FF] text-zinc-300 hover:text-[#00E5FF] transition-colors"
             title="Open Real Tools & Actions Center"
@@ -569,6 +714,36 @@ export default function App() {
         >
           <Layers className="w-3 h-3" />
           Overlay
+        </button>
+
+        {/* Security Watch Mode */}
+        <button
+          onClick={() => setShowSecurityModal(true)}
+          className="px-3 py-1 rounded-full bg-cyan-950/40 border border-cyan-500/50 hover:bg-cyan-900/50 text-cyan-300 text-[11px] font-mono flex items-center gap-1.5 transition-all shadow-sm"
+        >
+          <Shield className="w-3 h-3 text-cyan-400" />
+          Security Watch
+        </button>
+
+        {/* Phone Utilities */}
+        <button
+          onClick={() => {
+            setUtilitiesTab('password');
+            setShowUtilitiesModal(true);
+          }}
+          className="px-3 py-1 rounded-full bg-purple-950/40 border border-purple-500/50 hover:bg-purple-900/50 text-purple-300 text-[11px] font-mono flex items-center gap-1.5 transition-all shadow-sm"
+        >
+          <Sliders className="w-3 h-3 text-purple-400" />
+          Phone Tools
+        </button>
+
+        {/* Visual Social Media Agent */}
+        <button
+          onClick={() => setShowSocialModal(true)}
+          className="px-3 py-1 rounded-full bg-pink-950/40 border border-pink-500/50 hover:bg-pink-900/50 text-pink-300 text-[11px] font-mono flex items-center gap-1.5 transition-all shadow-sm"
+        >
+          <Share2 className="w-3 h-3 text-pink-400" />
+          Social Agent
         </button>
 
         {/* Emergency SOS */}
@@ -682,6 +857,38 @@ export default function App() {
         deviceState={deviceState}
         primeContact={primeContact}
         onExecuteVoiceCommand={handleUserMessage}
+      />
+
+      {/* Complete Tools & Features Guide Modal */}
+      <ToolsGuideModal
+        isOpen={showGuideModal}
+        onClose={() => setShowGuideModal(false)}
+        onRunCommand={handleUserMessage}
+      />
+
+      {/* Security Watch Mode Modal (Camera Sentry) */}
+      <SecurityModeModal
+        isOpen={showSecurityModal}
+        onClose={() => setShowSecurityModal(false)}
+        onAlertTriggered={(msg) => {
+          speakText('Alert! Camera detected movement!');
+          handleUserMessage('Camera detected movement!');
+        }}
+      />
+
+      {/* Phone Utilities Modal (Password, QR, Speed, Notes, Cleaner) */}
+      <PhoneUtilitiesModal
+        isOpen={showUtilitiesModal}
+        onClose={() => setShowUtilitiesModal(false)}
+        initialTab={utilitiesTab}
+        onExecuteVoice={handleUserMessage}
+      />
+
+      {/* Visual Social Media Agent Modal (Instagram & Facebook Closed Loop) */}
+      <SocialMediaAgentModal
+        isOpen={showSocialModal}
+        onClose={() => setShowSocialModal(false)}
+        onExecuteCommand={handleUserMessage}
       />
 
       {/* Call Assistant Modal */}

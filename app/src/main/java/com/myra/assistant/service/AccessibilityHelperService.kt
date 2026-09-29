@@ -13,6 +13,12 @@ class AccessibilityHelperService : AccessibilityService() {
         var instance: AccessibilityHelperService? = null
             private set
 
+        @Volatile
+        var eventStamp: Long = 0L
+
+        @Volatile
+        var windowStamp: Long = 0L
+
         fun isEnabled(context: Context): Boolean {
             val enabledServices = Settings.Secure.getString(
                 context.contentResolver,
@@ -29,7 +35,10 @@ class AccessibilityHelperService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // Handled as needed for context awareness
+        eventStamp++
+        if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            windowStamp++
+        }
     }
 
     override fun onInterrupt() {

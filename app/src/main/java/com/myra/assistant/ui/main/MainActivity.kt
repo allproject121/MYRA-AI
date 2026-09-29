@@ -287,6 +287,47 @@ class MainActivity : AppCompatActivity() {
             outputBuffer.append(text)
         }
 
+        geminiLive?.onToolCallReceived = { callId, name, args ->
+            runOnUiThread {
+                when (name) {
+                    "openWhatsApp" -> {
+                        viewModel.executeCommand(com.myra.assistant.model.AppCommand(
+                            com.myra.assistant.model.AppCommand.TYPE_OPEN_APP,
+                            mapOf("app_name" to "whatsapp")
+                        ))
+                    }
+                    "openApp" -> {
+                        val appName = args.optString("appName", "YouTube")
+                        viewModel.executeCommand(com.myra.assistant.model.AppCommand(
+                            com.myra.assistant.model.AppCommand.TYPE_OPEN_APP,
+                            mapOf("app_name" to appName)
+                        ))
+                    }
+                    "openUrl" -> {
+                        val url = args.optString("url", "")
+                        viewModel.executeCommand(com.myra.assistant.model.AppCommand(
+                            com.myra.assistant.model.AppCommand.TYPE_OPEN_BROWSER,
+                            mapOf("url" to url)
+                        ))
+                    }
+                    "makeCall" -> {
+                        val phone = args.optString("phoneNumber", "")
+                        viewModel.executeCommand(com.myra.assistant.model.AppCommand(
+                            com.myra.assistant.model.AppCommand.TYPE_CALL_PHONE,
+                            mapOf("phone_number" to phone)
+                        ))
+                    }
+                    "callContact" -> {
+                        val contact = args.optString("contactName", "")
+                        viewModel.executeCommand(com.myra.assistant.model.AppCommand(
+                            com.myra.assistant.model.AppCommand.TYPE_CALL_PHONE,
+                            mapOf("contact_name" to contact)
+                        ))
+                    }
+                }
+            }
+        }
+
         geminiLive?.onTurnComplete = {
             runOnUiThread {
                 val userText = inputBuffer.toString().trim()
@@ -344,6 +385,21 @@ class MainActivity : AppCompatActivity() {
             Current Date/Time: $now.
             $personalityBlock
             You are speaking ALOUD — keep all responses natural, punchy, and conversational (max 2-3 sentences).
+
+            MULTILINGUAL VOICE SUPPORT:
+            - Automatically detect the language spoken by the user and respond in the exact same language (Hindi, English, Hinglish, Marathi, Gujarati, Bengali, Tamil, Telugu, Kannada, Malayalam, Punjabi, Urdu, etc.).
+            - If user speaks Hindi, respond in Hindi ("Hindi mein baat karo" -> switch immediately to Hindi).
+            - If user speaks English, respond in English ("Talk to me in English" -> switch to English).
+            - If user speaks Hinglish, respond in natural Hinglish.
+            - Automatically switch languages mid-conversation if the user switches. No manual selection required.
+
+            FUNCTION CALLING / REAL APP EXECUTION:
+            You have access to tools: openWhatsApp, openApp, openUrl, makeCall, callContact.
+            - "Open WhatsApp" / "WhatsApp kholo" -> invoke openWhatsApp.
+            - "Open YouTube", "Open Instagram", "Open Chrome", "Open Settings" -> invoke openApp(appName).
+            - "Mummy ko call karo", "Call Mom", "Call Rahul" -> invoke callContact(contactName).
+            - "Call 9876543210" -> invoke makeCall(phoneNumber).
+            Never pretend an action opened without executing the tool!
 
             MYRA TOOLS & CAPABILITIES AWARENESS (2026 EDITION):
             1. Communication: WhatsApp messaging, direct SMS, Email inbox/compose, Emergency SOS alert.
@@ -499,5 +555,64 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+}
+
+/**
+ * JavaScript-to-Native Android Bridge for MYRA Assistant
+ * Bound to WebViews to execute device actions:
+ * - openApp(appName)
+ * - makeCall(phoneNumber)
+ * - callContact(contactName)
+ * - openWhatsApp()
+ * - openUrl(url)
+ */
+class MyraAndroidBridge(
+    private val context: Context,
+    private val viewModel: MainViewModel
+) {
+    @android.webkit.JavascriptInterface
+    fun openApp(appName: String): Boolean {
+        viewModel.executeCommand(com.myra.assistant.model.AppCommand(
+            com.myra.assistant.model.AppCommand.TYPE_OPEN_APP,
+            mapOf("app_name" to appName)
+        ))
+        return true
+    }
+
+    @android.webkit.JavascriptInterface
+    fun makeCall(phoneNumber: String): Boolean {
+        viewModel.executeCommand(com.myra.assistant.model.AppCommand(
+            com.myra.assistant.model.AppCommand.TYPE_CALL_PHONE,
+            mapOf("phone_number" to phoneNumber)
+        ))
+        return true
+    }
+
+    @android.webkit.JavascriptInterface
+    fun callContact(contactName: String): Boolean {
+        viewModel.executeCommand(com.myra.assistant.model.AppCommand(
+            com.myra.assistant.model.AppCommand.TYPE_CALL_PHONE,
+            mapOf("contact_name" to contactName)
+        ))
+        return true
+    }
+
+    @android.webkit.JavascriptInterface
+    fun openWhatsApp(): Boolean {
+        viewModel.executeCommand(com.myra.assistant.model.AppCommand(
+            com.myra.assistant.model.AppCommand.TYPE_OPEN_APP,
+            mapOf("app_name" to "whatsapp")
+        ))
+        return true
+    }
+
+    @android.webkit.JavascriptInterface
+    fun openUrl(url: String): Boolean {
+        viewModel.executeCommand(com.myra.assistant.model.AppCommand(
+            com.myra.assistant.model.AppCommand.TYPE_OPEN_BROWSER,
+            mapOf("url" to url)
+        ))
+        return true
     }
 }

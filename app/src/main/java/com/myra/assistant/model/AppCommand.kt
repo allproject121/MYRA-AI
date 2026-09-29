@@ -65,5 +65,9 @@ data class AppCommand(
         const val TYPE_KILL_TASK = "KILL_TASK"
         const val TYPE_START_MISSION = "START_MISSION"
         const val TYPE_SYSTEM_HEALTH = "SYSTEM_HEALTH"
+
+        // Visual Social Media Agent
+        const val TYPE_SOCIAL_MEDIA_TASK = "SOCIAL_MEDIA_TASK"
+        const val TYPE_SOCIAL_MEDIA_CONTROL = "SOCIAL_MEDIA_CONTROL"
     }
 }

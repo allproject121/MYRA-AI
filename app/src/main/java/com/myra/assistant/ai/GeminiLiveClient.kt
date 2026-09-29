@@ -33,6 +33,7 @@ class GeminiLiveClient(private val context: Context) {
     var onInputTranscript: ((String) -> Unit)? = null
     var onOutputTranscript: ((String) -> Unit)? = null
     var onTurnComplete: (() -> Unit)? = null
+    var onToolCallReceived: ((callId: String, name: String, args: JSONObject) -> Unit)? = null
 
     private var webSocket: WebSocket? = null
     private val client = OkHttpClient.Builder()
@@ -125,6 +126,71 @@ class GeminiLiveClient(private val context: Context) {
                     })
                     put("output_audio_transcription", JSONObject())
                     put("input_audio_transcription", JSONObject())
+
+                    // Real device action tools for Gemini Live Function Calling
+                    val tools = JSONArray().apply {
+                        put(JSONObject().apply {
+                            val functionDeclarations = JSONArray().apply {
+                                put(JSONObject().apply {
+                                    put("name", "openWhatsApp")
+                                    put("description", "Opens WhatsApp application to chat or message.")
+                                    put("parameters", JSONObject().apply {
+                                        put("type", "OBJECT")
+                                        put("properties", JSONObject().apply {
+                                            put("phone", JSONObject().apply { put("type", "STRING") })
+                                            put("message", JSONObject().apply { put("type", "STRING") })
+                                        })
+                                    })
+                                })
+                                put(JSONObject().apply {
+                                    put("name", "openApp")
+                                    put("description", "Opens an installed app like WhatsApp, YouTube, Instagram, Chrome, Settings, Spotify, Camera, Maps.")
+                                    put("parameters", JSONObject().apply {
+                                        put("type", "OBJECT")
+                                        put("properties", JSONObject().apply {
+                                            put("appName", JSONObject().apply { put("type", "STRING") })
+                                        })
+                                        put("required", JSONArray().apply { put("appName") })
+                                    })
+                                })
+                                put(JSONObject().apply {
+                                    put("name", "openUrl")
+                                    put("description", "Opens a website URL in the browser.")
+                                    put("parameters", JSONObject().apply {
+                                        put("type", "OBJECT")
+                                        put("properties", JSONObject().apply {
+                                            put("url", JSONObject().apply { put("type", "STRING") })
+                                        })
+                                        put("required", JSONArray().apply { put("url") })
+                                    })
+                                })
+                                put(JSONObject().apply {
+                                    put("name", "makeCall")
+                                    put("description", "Dials a phone number on the phone dialer.")
+                                    put("parameters", JSONObject().apply {
+                                        put("type", "OBJECT")
+                                        put("properties", JSONObject().apply {
+                                            put("phoneNumber", JSONObject().apply { put("type", "STRING") })
+                                        })
+                                        put("required", JSONArray().apply { put("phoneNumber") })
+                                    })
+                                })
+                                put(JSONObject().apply {
+                                    put("name", "callContact")
+                                    put("description", "Searches user phone contacts by name (e.g. Mom, Mummy, Rahul, Dad, Priya) and initiates a phone call.")
+                                    put("parameters", JSONObject().apply {
+                                        put("type", "OBJECT")
+                                        put("properties", JSONObject().apply {
+                                            put("contactName", JSONObject().apply { put("type", "STRING") })
+                                        })
+                                        put("required", JSONArray().apply { put("contactName") })
+                                    })
+                                })
+                            }
+                            put("function_declarations", functionDeclarations)
+                        })
+                    }
+                    put("tools", tools)
                 })
             }
             webSocket?.send(setupJson.toString())
@@ -234,10 +300,53 @@ class GeminiLiveClient(private val context: Context) {
                 }
             }
 
-            // 4. Turn Complete
+            // 4. Tool Calling (Function Calls from Gemini Live)
+            val toolCall = serverContent.optJSONObject("toolCall")
+            if (toolCall != null) {
+                val functionCalls = toolCall.optJSONArray("functionCalls")
+                if (functionCalls != null) {
+                    for (i in 0 until functionCalls.length()) {
+                        val call = functionCalls.getJSONObject(i)
+                        val callId = call.optString("id")
+                        val name = call.optString("name")
+                        val args = call.optJSONObject("args") ?: JSONObject()
+                        onToolCallReceived?.invoke(callId, name, args)
+                        // Send success response back to Gemini so audio flow continues seamlessly
+                        sendToolResponse(callId, name, JSONObject().put("status", "success"))
+                    }
+                }
+            }
+
+            // 5. Turn Complete
             if (serverContent.optBoolean("turnComplete", false)) {
                 onTurnComplete?.invoke()
             }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun sendToolResponse(callId: String, name: String, result: JSONObject) {
+        try {
+            val responseJson = JSONObject().apply {
+                put("client_content", JSONObject().apply {
+                    put("turns", JSONArray().apply {
+                        put(JSONObject().apply {
+                            put("role", "user")
+                            put("parts", JSONArray().apply {
+                                put(JSONObject().apply {
+                                    put("function_response", JSONObject().apply {
+                                        put("name", name)
+                                        put("response", result)
+                                    })
+                                })
+                            })
+                        })
+                    })
+                    put("turn_complete", true)
+                })
+            }
+            webSocket?.send(responseJson.toString())
         } catch (e: Exception) {
             e.printStackTrace()
         }

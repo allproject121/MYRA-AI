@@ -29,6 +29,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.myra.assistant.model.AppCommand
 import com.myra.assistant.service.AccessibilityHelperService
+import com.myra.assistant.social.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -40,6 +41,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val commandResult: LiveData<String?> = _commandResult
 
     private var isTorchOn = false
+
+    private val screenDriver = AccessibilityScreenDriver()
+    private val mediaResolver = MediaResolver(application)
+    val socialMediaAgent = SocialMediaAgent(application, screenDriver, mediaResolver)
 
     private val commonPackageMap = mapOf(
         "youtube" to "com.google.android.youtube",
@@ -152,6 +157,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // Search & Browser
                 AppCommand.TYPE_SEARCH_GOOGLE -> searchGoogle(command.params["query"] ?: "")
                 AppCommand.TYPE_OPEN_BROWSER -> openBrowser()
+
+                // Visual Social Media Agent (Closed-Loop UI Automation)
+                AppCommand.TYPE_SOCIAL_MEDIA_TASK -> {
+                    val platform = if (command.params["platform"] == "FACEBOOK") SocialPlatform.FACEBOOK else SocialPlatform.INSTAGRAM
+                    val action = when (command.params["action"]) {
+                        "POST_STORY" -> SocialAction.POST_STORY
+                        "POST_REEL" -> SocialAction.POST_REEL
+                        "POST_TEXT" -> SocialAction.POST_TEXT
+                        else -> SocialAction.POST_FEED
+                    }
+                    val task = SocialMediaTask(
+                        taskId = "social-${System.currentTimeMillis()}",
+                        platform = platform,
+                        action = action,
+                        caption = command.params["caption"]
+                    )
+                    val result = socialMediaAgent.executeTask(task)
+                    val response = when (result.status) {
+                        SocialTaskStatus.AWAITING_CONFIRMATION -> result.confirmationQuestion ?: "Post ready. Should I share it?"
+                        SocialTaskStatus.PUBLISHED -> "Post published successfully to ${result.platform}!"
+                        SocialTaskStatus.SUBMITTED_UNVERIFIED -> "Post submitted to ${result.platform}."
+                        SocialTaskStatus.USER_ACTION_REQUIRED -> result.failureReason ?: "Action required on screen."
+                        SocialTaskStatus.DRAFT_READY -> "Draft prepared on ${result.platform}."
+                        else -> result.failureReason ?: "Social media task could not be completed."
+                    }
+                    _commandResult.postValue(response)
+                }
+
+                AppCommand.TYPE_SOCIAL_MEDIA_CONTROL -> {
+                    val cmd = command.params["command"] ?: "status"
+                    val result = socialMediaAgent.handleControl(cmd)
+                    val response = when (result.status) {
+                        SocialTaskStatus.PUBLISHED -> "Confirmed! Post published to ${result.platform}."
+                        SocialTaskStatus.REJECTED -> "Post publication cancelled."
+                        else -> result.failureReason ?: "Social media task updated."
+                    }
+                    _commandResult.postValue(response)
+                }
 
                 // App Control
                 AppCommand.TYPE_OPEN_APP -> openApp(command.params["app_name"] ?: "")

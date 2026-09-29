@@ -60,6 +60,20 @@
             android:exported="false"
             android:screenOrientation="portrait" />
 
+        <!-- Media Handoff Activity for Social Media Agent -->
+        <activity
+            android:name=".social.MediaHandoffActivity"
+            android:exported="true"
+            android:theme="@style/Theme.AppCompat.Dialog"
+            android:label="Share with MYRA">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="video/*" />
+            </intent-filter>
+        </activity>
+
         <!-- Floating Orb Overlay Service -->
         <service
             android:name=".service.MyraOverlayService"
