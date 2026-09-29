@@ -1,0 +1,8 @@
+{
+  "name": "MYRA AI Assistant",
+  "description": "Futuristic sci-fi voice AI companion with reactive pulsing orb, GF/Professional/Assistant personalities, device control simulation, prime contact speed dialing, and call assistance.",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ],
+  "permissions": []
+}
